@@ -606,6 +606,7 @@ const detailFund = ref<any>(null)
 const detailTxs = ref<any[]>([])
 const detailNavList = ref<any[]>([]) // 升序 [{date, nav}]
 const detailDailyPnl = ref<any[]>([]) // 每日收益明细 [{date, nav, daily_return, shares, pnl}]
+const detailFees = ref<any>(null) // 基金真实费率（fund_fees）
 
 // 查看基金详情（弹窗：涨幅折线图 + 买卖节点 + 基金信息）
 const viewFundDetail = async (fund: any) => {
@@ -632,6 +633,13 @@ const viewFundDetail = async (fund: any) => {
       detailDailyPnl.value = (dailyPnlRes.data && dailyPnlRes.data.data) || []
     } catch (e2) {
       detailDailyPnl.value = []
+    }
+    // 费率详情（真实 fund_fees：申购/赎回阶梯/管理/托管）
+    try {
+      const feeRes = await axios.get('/api/ai/fund-fees', { params: { fund_code: code } })
+      detailFees.value = (feeRes.data && feeRes.data.found) ? feeRes.data : null
+    } catch (e4) {
+      detailFees.value = null
     }
     // 基金基本信息（/api/funds/:code 查 funds 表，含经理/成立日期/基准；列表接口查 fund_universe 无这些字段）
     try {
@@ -1417,6 +1425,21 @@ onMounted(() => {
               <span class="value benchmark">{{ detailFund.benchmark || '—' }}</span>
             </div>
           </div>
+
+          <div v-if="detailFees" class="detail-section-title" style="margin-top:18px">费率详情（真实费率）</div>
+          <div v-if="detailFees" class="fee-grid">
+            <div class="fee-item"><span class="fee-label">申购费率</span><span class="fee-value">{{ detailFees.buy_fee_pct }}%</span></div>
+            <div class="fee-item"><span class="fee-label">管理费率（年）</span><span class="fee-value">{{ detailFees.manage_fee_pct }}%</span></div>
+            <div class="fee-item"><span class="fee-label">托管费率（年）</span><span class="fee-value">{{ detailFees.custody_fee_pct }}%</span></div>
+            <div class="fee-item"><span class="fee-label">销售服务费（年）</span><span class="fee-value">{{ detailFees.service_fee_pct }}%</span></div>
+            <div class="fee-item fee-wide"><span class="fee-label">赎回费率（持有天数阶梯）</span>
+              <span class="fee-value">
+                <span v-for="(sc, si) in detailFees.sell_schedule" :key="si" class="fee-step">
+                  {{ sc.days === 0 ? '≥1年' : '<' + sc.days + '天' }}：{{ sc.rate_pct }}%
+                </span>
+              </span>
+            </div>
+          </div>
         </div>
       </a-spin>
     </a-modal>
@@ -1449,6 +1472,12 @@ onMounted(() => {
 .act-body { flex: 1; min-width: 0; }
 .act-title { font-size: 13px; color: #cbd5e1; }
 .act-desc { font-size: 12px; color: #64748b; margin-top: 2px; line-height: 1.5; }
+.fee-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+.fee-item { padding: 8px 12px; background: rgba(15,20,40,0.4); border-radius: 8px; }
+.fee-wide { grid-column: 1 / -1; }
+.fee-label { font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px; }
+.fee-value { font-size: 13px; color: #e2e8f0; font-weight: 600; }
+.fee-step { display: inline-block; margin: 2px 8px 2px 0; padding: 1px 8px; border-radius: 8px; background: rgba(99,102,241,0.12); color: #a5b4fc; font-size: 12px; }
 .pnl-breakdown { display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0 4px; }
 .bd-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; background: var(--card-bg, #1c2348); border: 1px solid rgba(99,102,241,0.15); border-radius: 10px; font-size: 13px; }
 .bd-item .bd-label { color: #94a3b8; }

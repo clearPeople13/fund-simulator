@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   WalletOutlined,
   LineChartOutlined,
@@ -19,6 +19,8 @@ const portfolioStats = ref({
 })
 
 const holdings = ref([])
+const dailyPnl = ref([]) // 每日收益明细
+const fundNames = ref({})
 
 // a-table 列配置
 const tableColumns = [
@@ -32,6 +34,21 @@ const tableColumns = [
   { title: '盈亏', key: 'profit_loss', width: 120 },
   { title: '收益率', key: 'profit_loss_rate', width: 100 }
 ]
+
+// 每日收益明细动态列（每只持仓基金一列）
+const dailyColumns = computed(() => {
+  const base = [
+    { title: '日期', dataIndex: 'date', key: 'date', width: 110 },
+    { title: '当日盈亏', key: 'pnl', width: 110, align: 'right' },
+    { title: '账户快照对照', key: 'account_pnl', width: 130, align: 'right' }
+  ]
+  const fundCols = Object.keys(fundNames.value).map(c => ({
+    title: `${c} ${fundNames.value[c]}`,
+    key: 'fund_' + c,
+    align: 'right'
+  }))
+  return [...base, ...fundCols]
+})
 
 // 初始化资产配置图（真实持仓数据）
 const initAllocationChart = () => {
@@ -120,12 +137,44 @@ const loadData = async () => {
       total_return: currentAssets - initial,
       total_return_rate: initial > 0 ? Number(((currentAssets - initial) / initial * 100).toFixed(2)) : 0
     }
+    // 每日收益明细（账户级跨基金按日贡献 + 账户快照对照）
+    try {
+      const dpRes = await axios.get('/api/ai/daily-pnl')
+      if (dpRes.data && dpRes.data.list) {
+        dailyPnl.value = dpRes.data.list
+        fundNames.value = dpRes.data.fund_names || {}
+      }
+    } catch (e) {
+      console.error('加载每日收益明细失败:', e)
+    }
     loading.value = false
     setTimeout(() => initAllocationChart(), 100)
   } catch (error) {
     console.error('加载组合数据失败:', error)
     loading.value = false
   }
+}
+
+// 导出持仓 + 每日收益明细 CSV（纯前端 Blob 下载）
+const exportCSV = () => {
+  const esc = (v) => { const t = String(v ?? '').replace(/"/g, '""'); return `"${t}"` }
+  const lines = []
+  lines.push('持仓明细导出（' + new Date().toLocaleString() + '）')
+  lines.push(['代码', '基金名称', '类型', '份额', '成本价', '现价', '市值', '盈亏', '收益率'].join(','))
+  holdings.value.forEach(r => lines.push([r.fund_code, r.fund_name, r.fund_type, r.shares, r.cost_price, r.current_price, r.market_value, r.profit_loss, r.profit_loss_rate + '%'].map(esc).join(',')))
+  lines.push('')
+  lines.push('每日收益明细（日期,当日盈亏,账户快照对照' + Object.keys(fundNames.value).map(c => ',' + c + ' ' + fundNames.value[c]).join('') + '）')
+  dailyPnl.value.forEach(r => {
+    const fundCols = Object.keys(fundNames.value).map(c => r.funds && r.funds[c] != null ? r.funds[c] : '')
+    lines.push([r.date, r.pnl, r.account_pnl != null ? r.account_pnl : '待更新', ...fundCols].join(','))
+  })
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = '组合明细_' + new Date().toISOString().slice(0, 10) + '.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 onMounted(() => {
@@ -190,7 +239,10 @@ onMounted(() => {
           <template #title>
             <div class="card-header">
               <span class="block-title-no-margin">持仓明细</span>
-              <a-tag>{{ holdings.length }} 只</a-tag>
+              <span>
+                <a-tag>{{ holdings.length }} 只</a-tag>
+                <a-button size="small" style="margin-left:8px" @click="exportCSV">导出 CSV</a-button>
+              </span>
             </div>
           </template>
           <a-table
@@ -239,6 +291,45 @@ onMounted(() => {
         </a-card>
       </a-col>
     </a-row>
+
+    <!-- 每日收益明细（账户级跨基金按日贡献） -->
+    <a-card :bordered="false" style="margin-top:20px">
+      <template #title>
+        <div class="card-header">
+          <span class="block-title-no-margin">📅 每日收益明细</span>
+          <a-tag>当日盈亏 = 收盘份额 × 净值变动（买入当日 T+1 无收益）</a-tag>
+        </div>
+      </template>
+      <a-table
+        :columns="dailyColumns"
+        :data-source="dailyPnl"
+        :pagination="false"
+        row-key="date"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'pnl'">
+            <span :class="record.pnl >= 0 ? 'profit' : 'loss'">
+              <template v-if="record.pnl > 0">+</template>{{ record.pnl.toFixed(2) }}
+            </span>
+          </template>
+          <template v-else-if="column.key === 'account_pnl'">
+            <span v-if="record.account_pnl == null" style="color:#64748b">待更新</span>
+            <span v-else :class="record.account_pnl >= 0 ? 'profit' : 'loss'">
+              <template v-if="record.account_pnl > 0">+</template>{{ Number(record.account_pnl).toFixed(2) }}
+            </span>
+          </template>
+          <template v-else-if="column.key.startsWith('fund_')">
+            <template v-if="record.funds && record.funds[column.key.slice(5)] != null">
+              <span :class="record.funds[column.key.slice(5)] >= 0 ? 'profit' : 'loss'">
+                <template v-if="record.funds[column.key.slice(5)] > 0">+</template>{{ record.funds[column.key.slice(5)].toFixed(2) }}
+              </span>
+            </template>
+            <template v-else><span style="color:#475569">—</span></template>
+          </template>
+        </template>
+      </a-table>
+    </a-card>
   </div>
   </a-spin>
 </template>

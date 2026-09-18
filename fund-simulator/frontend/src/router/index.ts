@@ -30,6 +30,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '基金详情' }
   },
   {
+    path: '/market',
+    name: 'Market',
+    component: () => import('../views/Market.vue'),
+    meta: { title: '市场行情' }
+  },
+  {
     path: '/portfolio',
     name: 'Portfolio',
     component: () => import('../views/Portfolio.vue'),

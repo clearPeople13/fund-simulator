@@ -21,6 +21,7 @@ const route = useRoute()
 const activeIndex = computed(() => {
   const p = route.path
   if (p.startsWith('/funds')) return '/funds'
+  if (p.startsWith('/market')) return '/market'
   if (p.startsWith('/analysis') || p.startsWith('/ai-analysis')) return '/analysis'
   if (p.startsWith('/alerts')) return '/alerts'
   if (p.startsWith('/reports')) return '/reports'
@@ -122,6 +123,10 @@ onMounted(() => {
             <a-menu-item key="/funds">
               <UnorderedListOutlined />
               <span>基金库</span>
+            </a-menu-item>
+            <a-menu-item key="/market">
+              <LineChartOutlined />
+              <span>市场行情</span>
             </a-menu-item>
             <a-menu-item key="/analysis">
               <BarChartOutlined />

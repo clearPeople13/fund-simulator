@@ -11,6 +11,7 @@ const loading = ref(true)
 const fundCode = ref(route.params.code)
 const fundInfo = ref(null)
 const fundReturns = ref([])
+const fundDividends = ref({ total: 0, list: [] })
 
 // a-table 列配置（最近净值）
 const navColumns = [
@@ -111,6 +112,12 @@ const loadFundDetail = async () => {
     } catch (e) { console.warn('加载区间涨跌幅失败:', e.message) }
     fundReturns.value = returnsData
 
+    // 历史分红明细
+    try {
+      const divRes = await axios.get(`/api/funds/${fundCode.value}/dividends`, { params: { limit: 30 } })
+      if (divRes.data) fundDividends.value = divRes.data
+    } catch (e) { fundDividends.value = { total: 0, list: [] } }
+
     fundInfo.value = {
       fund_code: fund.fund_code || fundCode.value,
       fund_name: fund.fund_name || fundCode.value,
@@ -142,6 +149,13 @@ const loadFundDetail = async () => {
 // 涨跌幅条形：正右负左，宽度按最大绝对值归一化（半幅 50%）
 const returnsMax = (list) => Math.max(...list.map(p => Math.abs(p.value || 0)), 1e-6)
 const retWidth = (v, max) => Math.min(Math.abs(v) / max * 50, 50)
+
+// 历史分红列
+const dividendColumns = [
+  { title: '除息日', dataIndex: 'ex_date', width: 120 },
+  { title: '每份分红', dataIndex: 'per_unit', width: 120, customRender: ({ text }) => '¥' + Number(text).toFixed(4) },
+  { title: '类型', dataIndex: 'type', width: 80, customRender: ({ text }) => (text === 'CASH' ? '现金分红' : text) }
+]
 
 // AI分析
 const goToAIAnalysis = () => {
@@ -249,6 +263,25 @@ onMounted(() => {
           </div>
         </div>
         <div v-else class="returns-empty">暂无足够净值数据</div>
+      </a-card>
+
+      <!-- 历史分红 -->
+      <a-card :bordered="false" class="dividend-card">
+        <template #title>
+          <div class="block-title-inline">历史分红</div>
+          <span class="returns-sub" v-if="fundDividends.total">累计 {{ fundDividends.total }} 次 · 数据由累计净值-单位净值推导</span>
+          <span class="returns-sub" v-else>暂无分红记录（数据源未提供累计净值）</span>
+        </template>
+        <a-table
+          v-if="fundDividends.list.length"
+          :columns="dividendColumns"
+          :data-source="fundDividends.list"
+          :pagination="false"
+          row-key="ex_date"
+          size="small"
+          class="dividend-table"
+        />
+        <div v-else class="returns-empty">该基金暂无分红记录</div>
       </a-card>
 
       <!-- 最近净值 -->
@@ -391,6 +424,9 @@ onMounted(() => {
 /* 涨跌幅（支付宝式） */
 .returns-card { margin-bottom: 20px; }
 .block-title-inline { display: inline-block; font-size: 15px; font-weight: 600; color: var(--text, #e8ebff); }
+.dividend-card { margin-top: 16px; }
+.dividend-table :deep(.ant-table-thead > tr > th) { font-size: 12px; }
+.dividend-table :deep(.ant-table-tbody > tr > td) { font-size: 13px; color: #cbd5e1; }
 .returns-sub { margin-left: 10px; font-size: 12px; color: #8b92b8; }
 .returns-list { display: flex; flex-direction: column; gap: 14px; padding: 4px 8px 8px; }
 .ret-row { display: flex; align-items: center; gap: 14px; }

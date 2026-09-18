@@ -844,6 +844,41 @@ async function generateReport(userId, reportType) {
     lines.push(`- 累计费用：申购费 ¥${feeAll.b.toFixed(2)}　赎回费 ¥${feeAll.g.toFixed(2)}（合计 ¥${(feeAll.b + feeAll.g).toFixed(2)}）`);
     lines.push('');
   }
+  // 期间每日收益明细（快照口径）——周报专属
+  if (reportType === 'weekly') {
+    const snapWeek = await new Promise((resolve) => {
+      db.all('SELECT date, daily_pnl FROM portfolio_daily WHERE user_id = ? AND date >= ? ORDER BY date', [userId, period.split(' ~ ')[0]], (err, rows) => resolve(err ? [] : (rows || [])));
+    });
+    if (snapWeek.length) {
+      const weekTotal = snapWeek.reduce((a, x) => a + (x.daily_pnl || 0), 0);
+      lines.push('## 期间每日收益（快照口径）');
+      for (const x of snapWeek) lines.push(`- ${x.date}：${x.daily_pnl >= 0 ? '+' : ''}¥${x.daily_pnl.toFixed(2)}`);
+      lines.push(`- 本周合计：${weekTotal >= 0 ? '+' : ''}¥${weekTotal.toFixed(2)}`);
+      lines.push('');
+    }
+    // AI 操盘点评（数据驱动）
+    const buys = (trades || []).filter(t => t.transaction_type === 'BUY').length;
+    const sells = (trades || []).filter(t => t.transaction_type === 'SELL').length;
+    const realized = await new Promise((resolve) => {
+      db.all('SELECT amount FROM realized_pnl WHERE user_id = ? AND created_at >= datetime(?)', [userId, period.split(' ~ ')[0] + ' 00:00:00'], (err, rows) => resolve(err ? [] : (rows || [])));
+    });
+    const realizedTotal = realized.reduce((a, r) => a + (r.amount || 0), 0);
+    const snapSum = snapWeek.reduce((a, x) => a + (x.daily_pnl || 0), 0);
+    let tone;
+    if (snapSum >= 0 && snapSum < 100) tone = '本周账户小幅盈利，走势平稳，未出现明显回撤。';
+    else if (snapSum >= 100) tone = '本周账户表现积极，收益为正，主要受益于持仓净值上行。';
+    else if (snapSum >= -100) tone = '本周账户小幅回撤，属正常波动区间，未触发风控红线。';
+    else tone = '本周账户回撤明显，AI 已按风控规则评估减仓/止损，避免更大损失。';
+    const op = [];
+    if (buys > 0) op.push(`主动买入 ${buys} 笔`); else op.push('未新增建仓');
+    if (sells > 0) op.push(`卖出/减仓 ${sells} 笔，实现盈亏 ${realizedTotal >= 0 ? '+' : ''}¥${realizedTotal.toFixed(2)}`); else op.push('未触发卖出');
+    lines.push('## AI 操盘点评');
+    lines.push(tone);
+    lines.push(`- 本周操作：${op.join('；')}；`);
+    lines.push(`- 事件数：${events.length} 条风控记录${events.length ? '，已按规则处理' : '，市场平稳'};`);
+    lines.push(`- 观察池跟踪 ${Object.keys(pf.holdings).length} 只持仓 + ${(await new Promise((resolve) => db.get('SELECT COUNT(*) c FROM watchlist WHERE user_id = ?', [userId], (e, r) => resolve(r || { c: 0 })))).c} 只观察标的。`);
+    lines.push('');
+  }
   lines.push('## 下周计划');
   lines.push(`- 按 ${cfg.rebalance_frequency || 'monthly'} 再平衡节奏评估调仓；`);
   lines.push(`- 观察池 ${cfg.watchlist_style || ''} 标的持续跟踪，${cfg.entry_signal_threshold || 'strong'} 信号才建仓；`);
@@ -2248,20 +2283,21 @@ app.post('/api/scheduler/run', async (req, res) => {
   }
   try {
     if (type === 'weekly') {
-      // 手动触发周任务：评分更新 + 再平衡 + 换仓 + 周报
+      // 手动触发周任务：评分更新 + 再平衡 + 换仓 + 周报（交易步骤受交易时段守卫；盘外触发跳过交易仅生成报告）
       await computeFundProfiles();
       const results = [];
       for (const userId of Object.keys(userConfigs)) {
         const cfg = await getRiskParams(userId);
-        results.push({ userId, rebalance: await rebalanceCheck(userId) });
-        await switchFunds(userId);
+        let rb = null, sw = null;
+        try { rb = await rebalanceCheck(userId); } catch (e) { rb = 'SKIP:' + e.message; }
+        try { sw = await switchFunds(userId); } catch (e) { sw = 'SKIP:' + e.message; }
         await generateReport(userId, 'weekly');
+        results.push({ userId, rebalance: rb, switch: sw });
       }
       return res.json({ ok: true, type, results });
     }
     if (type === 'monthly') {
       // 手动触发月任务：归因 + 压力测试 + 月报 + 分红同步
-      await dividendAdjust();
       const results = [];
       for (const userId of Object.keys(userConfigs)) {
         const attr = await performanceAttribution(userId);

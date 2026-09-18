@@ -12,6 +12,7 @@ const fundCode = ref(route.params.code)
 const fundInfo = ref(null)
 const fundReturns = ref([])
 const fundDividends = ref({ total: 0, list: [] })
+const fundRank = ref(null)
 
 // a-table 列配置（最近净值）
 const navColumns = [
@@ -117,6 +118,12 @@ const loadFundDetail = async () => {
       const divRes = await axios.get(`/api/funds/${fundCode.value}/dividends`, { params: { limit: 30 } })
       if (divRes.data) fundDividends.value = divRes.data
     } catch (e) { fundDividends.value = { total: 0, list: [] } }
+
+    // 同类排名
+    try {
+      const rankRes = await axios.get(`/api/funds/${fundCode.value}/rank`)
+      if (rankRes.data && rankRes.data.found) fundRank.value = rankRes.data
+    } catch (e) { fundRank.value = null }
 
     fundInfo.value = {
       fund_code: fund.fund_code || fundCode.value,
@@ -284,6 +291,27 @@ onMounted(() => {
         <div v-else class="returns-empty">该基金暂无分红记录</div>
       </a-card>
 
+      <!-- 同类排名 -->
+      <a-card :bordered="false" class="rank-card" v-if="fundRank">
+        <template #title>
+          <div class="block-title-inline">同类排名</div>
+          <span class="returns-sub">全市场 {{ fundRank.fund_type }}基金 · 区间涨幅百分位（值越小越靠前）</span>
+        </template>
+        <div class="rank-list">
+          <div class="rank-row" v-for="r in fundRank.ranks" :key="r.key">
+            <span class="rank-label">{{ r.label }}</span>
+            <div class="rank-track">
+              <div class="rank-bar" :class="r.percentile <= 25 ? 'top' : r.percentile <= 60 ? 'mid' : 'bot'"
+                   :style="{ width: (100 - r.percentile) + '%' }"></div>
+              <div class="rank-marker" :style="{ left: r.percentile + '%' }"></div>
+            </div>
+            <span class="rank-value" :class="r.percentile <= 25 ? 'top' : r.percentile <= 60 ? 'mid' : 'bot'">
+              {{ r.rank }}/{{ r.total }} · 前 {{ r.percentile }}%
+            </span>
+          </div>
+        </div>
+      </a-card>
+
       <!-- 最近净值 -->
       <a-card :bordered="false" title="最近净值">
         <a-table
@@ -427,6 +455,20 @@ onMounted(() => {
 .dividend-card { margin-top: 16px; }
 .dividend-table :deep(.ant-table-thead > tr > th) { font-size: 12px; }
 .dividend-table :deep(.ant-table-tbody > tr > td) { font-size: 13px; color: #cbd5e1; }
+.rank-card { margin-top: 16px; }
+.rank-list { display: flex; flex-direction: column; gap: 12px; }
+.rank-row { display: flex; align-items: center; gap: 12px; }
+.rank-label { flex: 0 0 56px; font-size: 13px; color: #94a3b8; }
+.rank-track { position: relative; flex: 1; height: 8px; border-radius: 6px; background: rgba(148,163,184,0.15); }
+.rank-bar { position: absolute; left: 0; top: 0; height: 100%; border-radius: 6px; opacity: 0.85; }
+.rank-bar.top { background: linear-gradient(90deg, #34d399, #10b981); }
+.rank-bar.mid { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.rank-bar.bot { background: linear-gradient(90deg, #f87171, #ef4444); }
+.rank-marker { position: absolute; top: -3px; width: 3px; height: 14px; background: #e2e8f0; border-radius: 2px; }
+.rank-value { flex: 0 0 auto; font-size: 12px; font-weight: 600; min-width: 120px; text-align: right; }
+.rank-value.top { color: #34d399; }
+.rank-value.mid { color: #fbbf24; }
+.rank-value.bot { color: #f87171; }
 .returns-sub { margin-left: 10px; font-size: 12px; color: #8b92b8; }
 .returns-list { display: flex; flex-direction: column; gap: 14px; padding: 4px 8px 8px; }
 .ret-row { display: flex; align-items: center; gap: 14px; }

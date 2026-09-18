@@ -2064,11 +2064,14 @@ app.get('/api/ai/portfolio', async (req, res) => {
       });
     });
     const marketValueTotal = Object.values(holdings).reduce((sum, h) => sum + (h.market_value || h.total_cost), 0);
+    // 累计已实现盈亏 = Σ各持仓 realized_pnl（系统账本，精确对账）
+    const realizedTotal = Object.values(holdings).reduce((sum, h) => sum + (h.realized_pnl || 0), 0);
     res.json({
       initial_capital: portfolio.initial_capital,
       current_capital: portfolio.current_capital,
       holdings,
       total_assets: portfolio.current_capital + marketValueTotal,
+      realized_pnl: Math.round(realizedTotal * 100) / 100,
       today_pnl: todayPnlRow ? todayPnlRow.daily_pnl : null,
       fee_stats: feeStats
     });
@@ -2193,7 +2196,18 @@ app.get('/api/ai/transactions', async (req, res) => {
       });
       enriched.push({ ...tx, fund_name: fund ? fund.fund_name : tx.fund_code });
     }
-    res.json(enriched);
+    // 待确认订单（T+1：SUBMITTED，20:00 按 trade_date 官方净值落账）
+    const pendingRows = await new Promise((resolve, reject) => {
+      db.all("SELECT id, fund_code, order_type, amount, shares, price, fee, status, order_date, trade_date, reason FROM orders WHERE user_id = ? AND status = 'SUBMITTED' ORDER BY id DESC", [userId], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+    const pending = [];
+    for (const p of pendingRows) {
+      const fund = await new Promise((resolve) => {
+        db.get('SELECT fund_name FROM funds WHERE fund_code = ?', [p.fund_code], (err, row) => resolve(err ? null : row));
+      });
+      pending.push({ ...p, fund_name: fund ? fund.fund_name : p.fund_code });
+    }
+    res.json({ list: enriched, pending });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

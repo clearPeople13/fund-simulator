@@ -348,3 +348,4 @@
 6. ~~fund\_universe 每日 22:05 自动刷新待验证~~ **已完成（2026-09-18）**：启动日志确认排程生效（"每日 22:05 自动刷新，首次 2026/9/18 22:05"）；首次自动执行发生在今晚 22:05，次日查日志（[全市场基金库] 开始刷新…code=0）即可确认。
 
 7. ~~项目尚无 Git 仓库~~ **已完成（2026-09-18）**：根目录 `git init` 首次提交 228a808（242 文件，含运行数据库、知识库、设计规格、engine 修复脚本、README 新环境运行指引、.gitignore 排除 node_modules/dist/bak）。**维护铁律：规则/缺陷/功能改动必须同步文档（本文档 + .workbuddy/memory）并随代码一起 commit**。
+> **git 网络约定（2026-09-18 补充）**：本机 github.com 直连不稳定（443 超时），系统代理 127.0.0.1:51926 可用。仓库级已配 git config http.proxy http://127.0.0.1:51926；push 若遇代理端口变化，先 Test-NetConnection github.com -Port 443 直连，不通则 git config http.proxy http://<新端口>。凭据：credential.helper=store（token 存本机），push 偶发 "not a git command" 报错时用 git -c credential.helper=store push。

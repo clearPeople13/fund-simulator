@@ -1,0 +1,106 @@
+<html style="margin:0;padding:0;"><title>基金模拟交易系统 · 真实操作功能差距审查</title><div style="width:100%;box-sizing:border-box;background:#0e1329;color:#e8ebff;font-family:'Segoe UI','Microsoft YaHei',sans-serif;padding:28px 24px;border-radius:14px;">
+  <div style="font-size:20px;font-weight:700;margin-bottom:4px;">真实基金操作 · 功能差距审查</div>
+  <div style="font-size:13px;color:#9299c6;margin-bottom:20px;">以基金团队视角（研究员 → 基金经理 → 交易员 → 风控 → 绩效 → 运营）对照当前系统：✓ 已有 ｜ ◐ 部分/静态 ｜ ✗ 缺失</div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:14px;">
+
+    <div style="flex:1 1 46%;min-width:340px;background:#1c2348;border:1px solid #2e3768;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:10px;">① 投研层（研究员）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;">
+        <span style="color:#5ee08b;">✓ 基金库（17只真实基金+净值/估值）</span>
+        <span style="color:#f0b429;">◐ 基金详情/净值走势（只展示）</span>
+        <span style="color:#ff6b6b;">✗ 研究报告/尽调笔记/评分</span>
+        <span style="color:#ff6b6b;">✗ 风格定位（大盘/价值/成长）</span>
+        <span style="color:#ff6b6b;">✗ 基金经理/基金公司维度</span>
+        <span style="color:#ff6b6b;">✗ 宏观/行业/市场环境视角</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 46%;min-width:340px;background:#1c2348;border:1px solid #2e3768;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:10px;">② 决策层（基金经理）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;">
+        <span style="color:#5ee08b;">✓ 观察池信号（wait/buy/add/watch）</span>
+        <span style="color:#f0b429;">◐ 按性格选基/建议金额（10%/20%）</span>
+        <span style="color:#ff6b6b;">✗ 资产配置（股/债/现金目标比例）</span>
+        <span style="color:#ff6b6b;">✗ 组合构建/再平衡</span>
+        <span style="color:#ff6b6b;">✗ 退场决策：减仓/清仓/止盈止损</span>
+        <span style="color:#ff6b6b;">✗ 换仓（卖出A→买入B）</span>
+        <span style="color:#ff6b6b;">✗ 定投/定期定额计划</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 46%;min-width:340px;background:#1c2348;border:1px solid #2e3768;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:10px;">③ 交易执行层（交易员）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;">
+        <span style="color:#ff6b6b;">✗ 模拟申赎执行（AI决策→真实成交）</span>
+        <span style="color:#ff6b6b;">✗ 费用模型（申购费/赎回费/管理费/托管费）</span>
+        <span style="color:#f0b429;">◐ T+1 收益口径（有，无完整确认流）</span>
+        <span style="color:#ff6b6b;">✗ 撤单/调整/分批下单</span>
+        <span style="color:#ff6b6b;">✗ 大额交易/流动性限制</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 46%;min-width:340px;background:#1c2348;border:1px solid #2e3768;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:10px;">④ 风控层（风控）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;">
+        <span style="color:#f0b429;">◐ 止损价展示（-5%，仅静态参考）</span>
+        <span style="color:#ff6b6b;">✗ 止损/止盈/回撤触发引擎</span>
+        <span style="color:#ff6b6b;">✗ 仓位集中度/单基金上限</span>
+        <span style="color:#ff6b6b;">✗ 组合风险指标（波动率/夏普/最大回撤）</span>
+        <span style="color:#ff6b6b;">✗ 压力测试/情景分析</span>
+        <span style="color:#ff6b6b;">✗ 净值异动/连续下跌预警</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 46%;min-width:340px;background:#1c2348;border:1px solid #2e3768;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:10px;">⑤ 绩效层（绩效分析）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;">
+        <span style="color:#f0b429;">◐ 每日盈亏/资产走势（有图）</span>
+        <span style="color:#ff6b6b;">✗ 累计/年化收益、区间收益</span>
+        <span style="color:#ff6b6b;">✗ 基准对比（沪深300等）</span>
+        <span style="color:#ff6b6b;">✗ 超额收益/夏普/信息比率</span>
+        <span style="color:#ff6b6b;">✗ 业绩归因（配置贡献 vs 选基贡献）</span>
+        <span style="color:#ff6b6b;">✗ 周报/月报/年度报告</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 46%;min-width:340px;background:#1c2348;border:1px solid #2e3768;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:10px;">⑥ 运营层（运营）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;">
+        <span style="color:#5ee08b;">✓ 真实数据定时更新（天天基金）</span>
+        <span style="color:#5ee08b;">✓ 数据库定时备份</span>
+        <span style="color:#ff6b6b;">✗ 分红/拆分处理</span>
+        <span style="color:#ff6b6b;">✗ 申赎确认单/对账</span>
+        <span style="color:#ff6b6b;">✗ 数据质量校验/异常净值告警</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 46%;min-width:340px;background:#1c2348;border:1px solid #2e3768;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:10px;">⑦ 合规审计层</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;">
+        <span style="color:#ff6b6b;">✗ 操作留痕/审计日志（谁动了什么）</span>
+        <span style="color:#ff6b6b;">✗ 权限分级（查看/建议/执行）</span>
+        <span style="color:#ff6b6b;">✗ AI 决策可追溯（每条交易理由存档）</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 46%;min-width:340px;background:#1c2348;border:1px solid #2e3768;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:10px;">⑧ 监控预警层</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;">
+        <span style="color:#ff6b6b;">✗ 持仓预警（破止损线/趋势转空提醒）</span>
+        <span style="color:#ff6b6b;">✗ 观察池异动推送</span>
+        <span style="color:#ff6b6b;">✗ 市场事件/消息面提醒</span>
+        <span style="color:#ff6b6b;">✗ 每日复盘摘要（今日为何涨跌/该做什么）</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:18px;background:#181f40;border:1px solid #3d4784;border-radius:10px;padding:12px 16px;">
+    <div style="font-size:15px;font-weight:700;color:#8b9cf6;margin-bottom:8px;">补齐优先级（建议）</div>
+    <div style="font-size:13px;line-height:1.9;">
+      <span style="display:inline-block;background:#ff6b6b;color:#fff;border-radius:4px;padding:0 8px;margin-right:6px;font-weight:700;">P0 操盘闭环</span> 退场信号引擎 → 模拟执行引擎（AI自动申赎+费用+确认）→ 风控规则（止损/集中度/回撤熔断）<br>
+      <span style="display:inline-block;background:#f0b429;color:#241f00;border-radius:4px;padding:0 8px;margin-right:6px;font-weight:700;">P1 决策质量</span> 资产配置层 → 绩效（基准/超额/夏普/归因）→ 定期报告<br>
+      <span style="display:inline-block;background:#5ee08b;color:#00260f;border-radius:4px;padding:0 8px;margin-right:6px;font-weight:700;">P2 投研与运营</span> 研究报告/风格定位 → 分红处理/对账 → 审计留痕/权限
+    </div>
+  </div>
+</div></html>

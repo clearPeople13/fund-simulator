@@ -1,0 +1,21 @@
+# 依赖与构建产物
+node_modules/
+dist/
+*.tsbuildinfo
+
+# 数据库备份与临时文件
+*.bak*
+backups/
+/fund_simulator.db
+
+# 编辑器
+.vscode/
+.idea/
+
+# 系统/日志
+*.log
+.DS_Store
+
+# 运行时临时数据
+*.tmp
+*.crdownload

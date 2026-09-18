@@ -12,6 +12,60 @@ const selectedType = ref('')
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+// 基金排行维度（支付宝式：近1周/1月/3月/6月/1年/今年来/成立来/规模）
+const rankTabs = [
+  { key: 'r1w', label: '近1周' },
+  { key: 'r1m', label: '近1月' },
+  { key: 'r3m', label: '近3月' },
+  { key: 'r6m', label: '近6月' },
+  { key: 'r1y', label: '近1年' },
+  { key: 'ytd', label: '今年来' },
+  { key: 'since', label: '成立来' },
+  { key: 'scale', label: '规模' }
+]
+const sortKey = ref('r6m')
+// 基金对比（最多 3 只）
+const compareCodes = ref([])
+const compareVisible = ref(false)
+const compareRows = computed(() => {
+  const selected = compareCodes.value.map(code => filteredFunds.value.find(f => f.fund_code === code)).filter(Boolean)
+  const metrics = [
+    { key: 'fund_name', label: '基金名称' },
+    { key: 'fund_type', label: '基金类型' },
+    { key: 'latest_nav', label: '最新净值', fmt: v => v != null ? '¥' + v : '—' },
+    { key: 'day_return', label: '日涨跌', pct: true },
+    { key: 'r1w', label: '近1周', pct: true },
+    { key: 'r1m', label: '近1月', pct: true },
+    { key: 'r3m', label: '近3月', pct: true },
+    { key: 'r6m', label: '近6月', pct: true },
+    { key: 'r1y', label: '近1年', pct: true },
+    { key: 'ytd', label: '今年来', pct: true },
+    { key: 'since', label: '成立来', pct: true },
+    { key: 'scale', label: '规模(亿)', fmt: v => v != null ? Number(v).toLocaleString() : '—' },
+    { key: 'inception_date', label: '成立日期' }
+  ]
+  return metrics.map(m => ({
+    label: m.label,
+    cells: selected.map(f => {
+      const v = f[m.key === 'r6m' ? 'recent_return' : m.key]
+      if (m.fmt) return { text: m.fmt(v), pct: false }
+      if (m.pct) return { text: v != null ? (v >= 0 ? '+' : '') + v + '%' : '—', pct: true, value: v }
+      return { text: v != null ? v : '—', pct: false }
+    })
+  }))
+})
+const toggleCompare = (code) => {
+  const idx = compareCodes.value.indexOf(code)
+  if (idx >= 0) {
+    compareCodes.value.splice(idx, 1)
+  } else if (compareCodes.value.length >= 3) {
+    return false
+  } else {
+    compareCodes.value.push(code)
+  }
+  return true
+}
+const rankLabel = computed(() => (rankTabs.find(t => t.key === sortKey.value) || rankTabs[3]).label)
 
 // 基金类型选项（全市场基金库：股票型/混合型/指数型/QDII）
 const fundTypes = [
@@ -36,15 +90,17 @@ const getTypeColor = (type) => {
 // 基金列表数据（服务端分页/搜索/类型过滤）
 const filteredFunds = computed(() => funds.value)
 
-// a-table 列配置
-const tableColumns = [
-  { title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 120 },
+// a-table 列配置（主涨幅列随排行维度动态变化）
+const tableColumns = computed(() => [
+  { title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 110 },
   { title: '基金名称', dataIndex: 'fund_name', key: 'fund_name' },
-  { title: '基金类型', dataIndex: 'fund_type', key: 'fund_type', width: 130 },
-  { title: '最新净值', key: 'latest_nav', width: 140 },
-  { title: '近6月收益', key: 'recent_return', width: 120, align: 'right' },
-  { title: '操作', key: 'actions', width: 200, fixed: 'right' }
-]
+  { title: '基金类型', dataIndex: 'fund_type', key: 'fund_type', width: 110 },
+  { title: '最新净值', key: 'latest_nav', width: 130 },
+  { title: rankLabel.value + (sortKey.value === 'scale' ? '（亿）' : '涨幅'), key: 'rank_value', width: 150, align: 'right' },
+  { title: '近1年', key: 'r1y_col', width: 100, align: 'right' },
+  { title: '对比', key: 'compare', width: 90, align: 'center' },
+  { title: '操作', key: 'actions', width: 195, fixed: 'right' }
+])
 
 // 加载基金列表（全市场基金库，服务端分页）
 const loadFunds = async () => {
@@ -56,7 +112,7 @@ const loadFunds = async () => {
         limit: pageSize.value,
         type: selectedType.value || undefined,
         keyword: searchQuery.value || undefined,
-        sort: 'r6m'
+        sort: sortKey.value
       }
     })
     funds.value = (response.data && response.data.data) || []
@@ -72,6 +128,20 @@ const loadFunds = async () => {
 // 查看基金详情
 const viewFundDetail = (code) => {
   router.push(`/funds/${code}`)
+}
+
+// 切换排行维度 → 回到第 1 页重新加载
+const handleRankChange = (key) => {
+  sortKey.value = key
+  currentPage.value = 1
+  loadFunds()
+}
+
+// 当前维度值（scale 显示规模，其余为涨幅；后端 r6m 返回为 recent_return 别名）
+const rankValue = (record) => {
+  const key = sortKey.value === 'r6m' ? 'recent_return' : sortKey.value
+  const v = record[key]
+  return v != null ? v : null
 }
 
 // 页码变化 → 服务端重新加载
@@ -178,6 +248,27 @@ onMounted(() => {
       </a-row>
     </a-card>
 
+    <!-- 基金排行维度 -->
+    <div class="rank-bar">
+      <span class="rank-title">🏆 基金排行</span>
+      <div class="rank-tabs">
+        <span
+          v-for="t in rankTabs"
+          :key="t.key"
+          class="rank-tab"
+          :class="{ active: sortKey === t.key }"
+          @click="handleRankChange(t.key)"
+        >{{ t.label }}</span>
+      </div>
+    </div>
+
+    <!-- 对比操作 -->
+    <div v-if="compareCodes.length" class="compare-bar">
+      <span>已选 <b>{{ compareCodes.length }}</b> 只（最多 3 只）</span>
+      <a-button type="primary" size="small" @click="compareVisible = true">开始对比</a-button>
+      <a-button size="small" @click="compareCodes = []">清空</a-button>
+    </div>
+
     <!-- 基金列表 -->
     <a-card class="fund-list-card" :bordered="false">
       <a-table
@@ -198,11 +289,41 @@ onMounted(() => {
             <span>{{ record.latest_nav != null ? '¥' + record.latest_nav : '—' }}</span>
             <div class="nav-date" v-if="record.latest_nav_date">{{ record.latest_nav_date }}</div>
           </template>
-          <template v-else-if="column.key === 'recent_return'">
-            <span v-if="record.recent_return != null" :class="record.recent_return >= 0 ? 'profit' : 'loss'">
-              {{ record.recent_return >= 0 ? '+' : '' }}{{ record.recent_return }}%
+          <template v-else-if="column.key === 'rank_value'">
+            <template v-if="rankValue(record) != null">
+              <template v-if="sortKey === 'scale'">
+                <span>{{ Number(rankValue(record)).toLocaleString() }} 亿</span>
+              </template>
+              <template v-else>
+                <div class="rank-cell">
+                  <div class="rank-track">
+                    <div class="rank-zero"></div>
+                    <div
+                      class="rank-fill"
+                      :class="rankValue(record) >= 0 ? 'up' : 'down'"
+                      :style="{ width: Math.min(48, Math.abs(rankValue(record))) + '%', left: rankValue(record) >= 0 ? '50%' : 'auto', right: rankValue(record) >= 0 ? 'auto' : (50 - Math.min(48, Math.abs(rankValue(record)))) + '%' }"
+                    ></div>
+                  </div>
+                  <span :class="rankValue(record) >= 0 ? 'profit' : 'loss'">
+                    {{ rankValue(record) >= 0 ? '+' : '' }}{{ rankValue(record) }}%
+                  </span>
+                </div>
+              </template>
+            </template>
+            <span v-else class="muted">—</span>
+          </template>
+          <template v-else-if="column.key === 'r1y_col'">
+            <span v-if="record.r1y != null" :class="record.r1y >= 0 ? 'profit' : 'loss'">
+              {{ record.r1y >= 0 ? '+' : '' }}{{ record.r1y }}%
             </span>
-            <span v-else>—</span>
+            <span v-else class="muted">—</span>
+          </template>
+          <template v-else-if="column.key === 'compare'">
+            <a-checkbox
+              :checked="compareCodes.includes(record.fund_code)"
+              :disabled="!compareCodes.includes(record.fund_code) && compareCodes.length >= 3"
+              @change="toggleCompare(record.fund_code)"
+            />
           </template>
           <template v-else-if="column.key === 'actions'">
             <div style="display: flex; gap: 8px">
@@ -233,6 +354,31 @@ onMounted(() => {
         />
       </div>
     </a-card>
+
+    <!-- 基金对比弹窗 -->
+    <a-modal v-model:open="compareVisible" title="📊 基金对比" :footer="null" width="860" :destroy-on-close="true">
+      <div v-if="compareRows.length" class="compare-table-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th class="metric-col">指标</th>
+              <th v-for="(r, ri) in compareRows[0].cells" :key="ri">{{ compareCodes[ri] || '—' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, idx) in compareRows" :key="idx">
+              <td class="metric-col">{{ row.label }}</td>
+              <td v-for="(c, ci) in row.cells" :key="ci">
+                <span v-if="c.pct" :class="c.value >= 0 ? 'profit' : 'loss'">{{ c.text }}</span>
+                <span v-else-if="row.label === '基金名称'" class="fund-name" @click="viewFundDetail(compareCodes[ci])">{{ c.text }}</span>
+                <span v-else>{{ c.text }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <a-empty v-else description="请先在列表勾选基金" />
+    </a-modal>
   </div>
 </template>
 
@@ -277,6 +423,32 @@ onMounted(() => {
 .fund-list-card {
   margin-bottom: 20px;
 }
+
+/* 排行维度 */
+.rank-bar { display: flex; align-items: center; gap: 16px; margin: 0 0 14px; flex-wrap: wrap; }
+.rank-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.rank-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.rank-tab {
+  padding: 6px 14px; border-radius: 16px; cursor: pointer; font-size: 13px;
+  color: var(--text-secondary); border: 1px solid var(--border); transition: all 0.2s; user-select: none;
+}
+.rank-tab:hover { color: var(--primary); border-color: var(--primary); }
+.rank-tab.active { background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.15)); color: #a5b4fc; border-color: rgba(99,102,241,0.5); font-weight: 600; }
+
+/* 涨幅条形 */
+.rank-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.rank-track { position: relative; width: 96px; height: 6px; background: rgba(30,41,59,0.6); border-radius: 3px; }
+.rank-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(148,163,184,0.5); }
+.rank-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.rank-fill.up { background: linear-gradient(90deg, rgba(52,211,153,0.4), #34d399); }
+.rank-fill.down { background: linear-gradient(90deg, #f87171, rgba(248,113,113,0.4)); }
+.muted { color: var(--text-muted); }
+.compare-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 10px 16px; background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); border-radius: 10px; font-size: 13px; color: var(--text); }
+.compare-table-wrap { overflow-x: auto; }
+.compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.compare-table th, .compare-table td { padding: 9px 12px; border-bottom: 1px solid rgba(148,163,184,0.15); text-align: center; color: var(--text); }
+.compare-table th { background: rgba(99,102,241,0.1); color: #a5b4fc; font-weight: 600; }
+.compare-table .metric-col { text-align: left; color: var(--text-secondary); white-space: nowrap; }
 
 .fund-name {
   color: #a5b4fc;

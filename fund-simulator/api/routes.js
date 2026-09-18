@@ -29,7 +29,8 @@ router.get('/funds', (req, res) => {
   // 排序白名单：支持按涨幅/净值/代码排序
   const sortMap = {
     fund_code: 'u.fund_code', fund_name: 'u.fund_name',
-    day_return: 'u.day_return', r1m: 'u.r1m', r3m: 'u.r3m', r6m: 'u.r6m', r1y: 'u.r1y',
+    day_return: 'u.day_return', r1w: 'u.r1w', r1m: 'u.r1m', r3m: 'u.r3m', r6m: 'u.r6m',
+    r1y: 'u.r1y', r2y: 'u.r2y', r3y: 'u.r3y', ytd: 'u.ytd', since: 'u.since',
     unit_nav: 'u.unit_nav', scale: 'u.scale'
   };
   const sortCol = sortMap[sort] || 'u.r6m';
@@ -37,7 +38,7 @@ router.get('/funds', (req, res) => {
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
   const query = `SELECT u.fund_code, u.fund_name, u.fund_type, u.unit_nav AS latest_nav, u.nav_date AS latest_nav_date,
-        u.day_return, u.r6m AS recent_return, u.inception_date, u.scale
+        u.day_return, u.r1w, u.r1m, u.r3m, u.r6m AS recent_return, u.r1y, u.r2y, u.r3y, u.ytd, u.since, u.inception_date, u.scale
       FROM fund_universe u${whereSql}
       ORDER BY ${sortCol} ${sortDir} LIMIT ? OFFSET ?`;
   params.push(parseInt(limit), offset);

@@ -1480,7 +1480,8 @@ onMounted(() => {
 .fee-wide { grid-column: 1 / -1; }
 .fee-label { font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px; }
 .fee-value { font-size: 13px; color: #e2e8f0; font-weight: 600; }
-.fee-step { display: inline-block; margin: 2px 8px 2px 0; padding: 1px 8px; border-radius: 8px; background: rgba(99,102,241,0.12); color: #a5b4fc; font-size: 12px; }
+.fee-wide .fee-value { display: flex; flex-wrap: wrap; gap: 6px; }
+.fee-step { display: inline-block; padding: 1px 8px; border-radius: 8px; background: rgba(99,102,241,0.12); color: #a5b4fc; font-size: 12px; }
 .pnl-breakdown { display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0 4px; }
 .bd-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; background: var(--card-bg, #1c2348); border: 1px solid rgba(99,102,241,0.15); border-radius: 10px; font-size: 13px; }
 .bd-item .bd-label { color: #94a3b8; }

@@ -886,7 +886,10 @@ async function generateReport(userId, reportType) {
 
   const content = lines.join('\n');
   await new Promise((resolve) => {
-    db.run('INSERT INTO reports (user_id, report_type, period, content) VALUES (?, ?, ?, ?)', [userId, reportType, period, content], (err) => resolve());
+    // 同周期去重：先删同 (user_id, report_type, period) 旧报告，再插入最新——避免手动/调度重复生成堆积
+    db.run('DELETE FROM reports WHERE user_id = ? AND report_type = ? AND period = ?', [userId, reportType, period], (err) => {
+      db.run('INSERT INTO reports (user_id, report_type, period, content) VALUES (?, ?, ?, ?)', [userId, reportType, period, content], (err2) => resolve());
+    });
   });
   return { userId, reportType, period, content };
 }
@@ -1252,7 +1255,9 @@ async function generatePressureReport(userId) {
   lines.push('- 持仓集中度：' + (total > 0 ? (marketValue / total * 100).toFixed(1) : 0) + '%' + (total > 0 && marketValue / total > (cfg.max_position || 0.6) ? '（超总仓位上限，需降仓）' : '（符合仓位上限）'));
   const content = lines.join('\n');
   await new Promise((resolve) => {
-    db.run('INSERT INTO reports (user_id, report_type, period, content) VALUES (?, ?, ?, ?)', [userId, 'pressure', getLocalDateStr(), content], (err) => resolve());
+    db.run("DELETE FROM reports WHERE user_id = ? AND report_type = 'pressure' AND period = ?", [userId, getLocalDateStr()], (err) => {
+      db.run('INSERT INTO reports (user_id, report_type, period, content) VALUES (?, ?, ?, ?)', [userId, 'pressure', getLocalDateStr(), content], (err2) => resolve());
+    });
   });
   return { userId, reportType: 'pressure', content };
 }
@@ -1301,7 +1306,9 @@ async function generateDailyRecap() {
     lines.push('- 关注持仓退场信号与观察池入场信号，' + (cfg.watchlist_style || '') + ' 方向标的优先');
     const content = lines.join('\n');
     await new Promise((resolve) => {
-      db.run('INSERT INTO reports (user_id, report_type, period, content) VALUES (?, ?, ?, ?)', [userId, 'daily', dateStr, content], (err) => resolve());
+      db.run("DELETE FROM reports WHERE user_id = ? AND report_type = 'daily' AND period = ?", [userId, dateStr], (err) => {
+        db.run('INSERT INTO reports (user_id, report_type, period, content) VALUES (?, ?, ?, ?)', [userId, 'daily', dateStr, content], (err2) => resolve());
+      });
     });
     console.log('[复盘] ' + userId + ' 每日复盘已生成');
   }

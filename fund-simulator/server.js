@@ -1625,6 +1625,13 @@ async function saveDailySnapshot(userId) {
   });
   if (holdingCodes.length === 0) return null; // 无持仓不写（今日盈亏由前端按空持仓处理为 0）
   for (const code of holdingCodes) {
+    // T+1：当日买入的持仓当日按成本计市值（无收益），不依赖当日净值 → 跳过净值检查
+    const lastBuy = await new Promise((resolve, reject) => {
+      db.get("SELECT transaction_date FROM transactions WHERE user_id = ? AND fund_code = ? AND transaction_type = 'BUY' ORDER BY transaction_date DESC LIMIT 1",
+        [userId, code], (err, row) => err ? reject(err) : resolve(row));
+    });
+    const pendingBuy = !!lastBuy && isSameLocalDay(lastBuy.transaction_date);
+    if (pendingBuy) continue;
     const nav = await new Promise((resolve, reject) => {
       db.get('SELECT nav_date FROM fund_nav WHERE fund_code = ? ORDER BY nav_date DESC LIMIT 1', [code], (err, row) => err ? reject(err) : resolve(row));
     });

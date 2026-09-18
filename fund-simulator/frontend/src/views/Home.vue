@@ -308,7 +308,10 @@ const loadHoldingsDetail = async () => {
         // 基金 T+1 规则：当日买入的份额按当日收盘净值确认，当日无收益
         const rawBuyDate = lastBuyRaw.get(code)
         const pendingConfirm = !!rawBuyDate && isSameLocalDay(rawBuyDate)
-        const isTodayNav = isSameLocalDay(latestNav.nav_date + " 00:00:00"); const todayPnl = pendingConfirm ? 0 : (isTodayNav ? marketValue * dailyReturn / 100 : null)
+        const isTodayNav = isSameLocalDay(latestNav.nav_date + " 00:00:00")
+        // 今日盈亏统一口径：份额 × (今日净值 - 昨日净值)（与每日收益明细一致；市值×收益率会多乘(1+收益率)）
+        const prevNav = navData.length >= 2 ? navData[1].unit_nav : null
+        const todayPnl = pendingConfirm ? 0 : (isTodayNav && prevNav != null ? holding.shares * (currentPrice - prevNav) : null)
         
         holdingsList.push({
           fund_code: code,

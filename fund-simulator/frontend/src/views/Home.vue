@@ -584,18 +584,22 @@ const viewFundDetail = async (fund: any) => {
     } catch (e2) {
       detailDailyPnl.value = []
     }
-    // 基金基本信息
-    const fundRes = await axios.get('/api/funds', { params: { limit: 100 } })
-    const info = ((fundRes.data && fundRes.data.data) || []).find((f: any) => f.fund_code === code)
-    if (info) {
-      detailFund.value = {
-        code: info.fund_code,
-        name: info.fund_name,
-        type: info.fund_type,
-        manager: info.manager,
-        inception_date: info.inception_date,
-        benchmark: info.benchmark
+    // 基金基本信息（/api/funds/:code 查 funds 表，含经理/成立日期/基准；列表接口查 fund_universe 无这些字段）
+    try {
+      const fundRes = await axios.get(`/api/funds/${code}`)
+      const info = fundRes.data
+      if (info && info.fund_code) {
+        detailFund.value = {
+          code: info.fund_code,
+          name: info.fund_name,
+          type: info.fund_type,
+          manager: info.manager,
+          inception_date: info.inception_date,
+          benchmark: info.benchmark
+        }
       }
+    } catch (e3) {
+      console.error('加载基金信息失败:', e3)
     }
   } catch (error) {
     console.error('加载基金详情失败:', error)

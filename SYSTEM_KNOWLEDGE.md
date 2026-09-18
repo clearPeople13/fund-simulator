@@ -301,6 +301,7 @@
 | 09-18 | funds 表被 AI 扫描喂大（101 只，大量淘汰孤儿） | 清理 42 只无引用基金（funds→59），净值历史保留；基金库=universe 不受影响；定期重跑 cleanup-funds-orphans.js |
 | 09-18 | 归因结果不写入月报正文（仅 API 返回） | generateReport 月报追加"业绩归因（简化 Brinson）"小节（配置/选基/总超额） |
 | 09-18 | 累计收益恒 0（总资产=现金+持仓成本，非市值） | /api/ai/portfolio 补 latest_nav/market_value/today_pnl，total_assets 改市值口径；Home.vue 卡片改用后端市值与快照盈亏 |
+| 09-18 | 详情弹窗基金经理/成立日期/基准显示 "—"（funds 表数据完好） | 根因：Home.vue 从 /api/funds 列表（fund_universe，无 manager/benchmark）取数；改取 /api/funds/:code（funds 表 SELECT *）；基金详情页本就正确 |
 
 
 

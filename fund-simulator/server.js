@@ -3360,6 +3360,11 @@ async function performAnalysis(analysisType, auto = false) {
     console.log(`[实时分析] 非交易时段，跳过本次半小时分析`);
     return;
   }
+  // pre_close/close 是交易日收盘任务：非交易日（周末/节假日）直接跳过，不生成空日报/不写快照
+  if ((analysisType === 'pre_close' || analysisType === 'close') && auto && !isTradingDay()) {
+    console.log(`[${analysisType}] 非交易日（周末/节假日），跳过`);
+    return;
+  }
   console.log(`\n=== ${typeNames[analysisType]}开始 ===`);
   console.log(`时间: ${new Date().toLocaleString('zh-CN')}`);
   

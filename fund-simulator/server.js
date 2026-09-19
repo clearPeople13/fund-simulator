@@ -12,15 +12,10 @@ const feeEngine = require('./engine/fee');
 const FundDataFetcher = require('./data-fetcher');
 
 const app = express();
-const { EventEmitter } = require('events');
-// AI 实时日志总线：关键决策节点通过它广播，/api/ai/stream (SSE) 推给前端
-const aiBus = new EventEmitter();
-aiBus.setMaxListeners(50);
-function logAi(type, payload = {}) {
-  const evt = { time: new Date().toISOString(), type, ...payload };
-  aiBus.emit('ai-log', evt);
-  return evt;
-}
+// 模块化：时间/交易日纯函数、AI 事件总线、统一错误处理（见 CODING_STANDARDS.md）
+const { getLocalDateStr, isTradingDay, isMarketOpenNow, nextTradingDay } = require('./utils/time');
+const { aiBus, logAi, init: initAiBus } = require('./events/aiBus');
+const { errorHandler, asyncHandler } = require('./middleware/errorHandler');
 const PORT = process.env.PORT || 3000;
 
 // 中间件
@@ -45,6 +40,7 @@ const db = new sqlite3.Database('./fund_simulator.db', (err) => {
     console.error('数据库连接失败:', err.message);
   } else {
     console.log('已连接到SQLite数据库');
+    initAiBus(db); // AI 事件总线绑定 db，logAi 才能落档
     initDatabase();
   }
 });
@@ -214,6 +210,14 @@ function initDatabase() {
       detail TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
+    db.run(`CREATE TABLE IF NOT EXISTS ai_event_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type TEXT,
+      user_name TEXT,
+      message TEXT,
+      detail TEXT,
+      event_time DATETIME
+    )`)
     db.run(`CREATE TABLE IF NOT EXISTS scheduler_runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       run_type TEXT,
@@ -1607,48 +1611,7 @@ async function ensureFundWithNav(f) {
   }
 }
 
-// 本地时区日期字符串（YYYY-MM-DD）
-function getLocalDateStr(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-// A股休市日（工作日内的法定节假日）：engine/holidays.json（国办发明电〔2025〕7号，2026）
-const HOLIDAYS = (() => {
-  try {
-    return require('./engine/holidays.json');
-  } catch {
-    return {};
-  }
-})();
-
-// 是否交易日：周一~周五 且 非节假日（节假日每年 11 月国务院公布后补充 holidays.json）
-function isTradingDay(d = new Date()) {
-  const dow = d.getDay();
-  if (dow === 0 || dow === 6) return false;
-  const year = String(d.getFullYear());
-  const list = HOLIDAYS[year] || [];
-  return list.indexOf(getLocalDateStr(d)) === -1;
-}
-
-// 是否正在连续竞价时段（交易日 9:30-11:30 / 13:00-15:00）
-function isMarketOpenNow(d = new Date()) {
-  if (!isTradingDay(d)) return false;
-  const h = d.getHours(), m = d.getMinutes();
-  const mins = h * 60 + m;
-  return (mins >= 570 && mins <= 690) || (mins >= 780 && mins <= 900); // 9:30=570, 11:30=690, 13:00=780, 15:00=900
-}
-
-// 找到不小于 date 的第一个交易日 0 点
-function nextTradingDay(date) {
-  const d = new Date(date);
-  while (!isTradingDay(d)) {
-    d.setDate(d.getDate() + 1);
-  }
-  return d;
-}
+// 时间/交易日函数已抽到 utils/time.js（唯一出处）；节假日表由该模块读 engine/holidays.json
 
 // SQLite CURRENT_TIMESTAMP 存 UTC（无时区标记）→ 转本地时间串（YYYY-MM-DD HH:mm:ss）
 function utcToLocalStr(utcStr) {

@@ -20,6 +20,8 @@
   --amber: #fbbf24;
   /* 语义色（深色适配） */
   --success: #34d399;
+  --up: #f87171;    /* A股涨红 */
+  --down: #34d399;  /* A股跌绿 */
   --warning: #fbbf24;
   --danger: #f87171;
   --info: #38bdf8;
@@ -462,8 +464,8 @@ body {
   letter-spacing: 0.3px;
 }
 
-.stat-card .stat-value.up { color: #34d399; }
-.stat-card .stat-value.down { color: #f87171; }
+.stat-card .stat-value.up { color: #f87171; }
+.stat-card .stat-value.down { color: #34d399; }
 
 /* 面板卡片 */
 .panel-card {
@@ -502,8 +504,8 @@ body {
 }
 
 /* 红绿涨跌 */
-.profit { color: #34d399 !important; font-weight: 600; }
-.loss { color: #f87171 !important; font-weight: 600; }
+.profit { color: #f87171 !important; font-weight: 600; }
+.loss { color: #34d399 !important; font-weight: 600; }
 
 /* 响应式 */
 @media (max-width: 1280px) {

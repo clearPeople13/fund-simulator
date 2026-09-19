@@ -12,6 +12,15 @@ const feeEngine = require('./engine/fee');
 const FundDataFetcher = require('./data-fetcher');
 
 const app = express();
+const { EventEmitter } = require('events');
+// AI 实时日志总线：关键决策节点通过它广播，/api/ai/stream (SSE) 推给前端
+const aiBus = new EventEmitter();
+aiBus.setMaxListeners(50);
+function logAi(type, payload = {}) {
+  const evt = { time: new Date().toISOString(), type, ...payload };
+  aiBus.emit('ai-log', evt);
+  return evt;
+}
 const PORT = process.env.PORT || 3000;
 
 // 中间件
@@ -2526,6 +2535,23 @@ app.get('/api/audit', (req, res) => {
   });
 });
 
+// AI 实时日志流（SSE）：前端 EventSource 订阅，AI 思考/分析/下单时实时推送
+app.get('/api/ai/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  res.write(': connected\n\n');
+  const send = (evt) => res.write('data: ' + JSON.stringify(evt) + '\n\n');
+  send({ time: new Date().toISOString(), type: 'system', message: 'AI 日志流已连接' });
+  const onLog = (evt) => send(evt);
+  aiBus.on('ai-log', onLog);
+  const heartbeat = setInterval(() => res.write(': hb\n\n'), 25000);
+  req.on('close', () => { clearInterval(heartbeat); aiBus.off('ai-log', onLog); });
+});
+
 app.get('/api/scheduler/status', (req, res) => {
   res.json({
     trading_day: isTradingDay(new Date()),
@@ -3365,6 +3391,7 @@ async function performAnalysis(analysisType, auto = false) {
     console.log(`[${analysisType}] 非交易日（周末/节假日），跳过`);
     return;
   }
+  logAi('phase', { phase: 'start', message: `${typeNames[analysisType]}开始` });
   console.log(`\n=== ${typeNames[analysisType]}开始 ===`);
   console.log(`时间: ${new Date().toLocaleString('zh-CN')}`);
   
@@ -3375,6 +3402,7 @@ async function performAnalysis(analysisType, auto = false) {
         const discover = await aiDiscoverWatchlist(userId);
         if (discover.inserted.length > 0) {
           console.log(`[AI自动选基] ${userConfigs[userId].name} 新增观察: ${discover.inserted.join(', ')}`);
+          logAi('discover', { user: userConfigs[userId].name, codes: discover.inserted, message: `🔍 AI 自主选基新增观察: ${discover.inserted.join(', ')}` });
         }
       } catch (e) {
         console.error(`[AI自动选基] ${userId} 刷新失败:`, e.message);
@@ -3389,6 +3417,7 @@ async function performAnalysis(analysisType, auto = false) {
         continue;
       }
       console.log(`分析观察池: ${fundList.join(', ')}`);
+      logAi('watchlist', { user: (userConfigs[userId]||{}).name || userId, count: fundList.length, message: `${(userConfigs[userId]||{}).name||userId} 开始分析观察池 ${fundList.length} 只` });
       
       // 获取当前持仓
       const portfolio = await getUserPortfolio(userId);
@@ -3409,6 +3438,7 @@ async function performAnalysis(analysisType, auto = false) {
         // 决策来自真实信号：分批建仓/逢低加仓 → BUY，其余 → 观察（HOLD）
         const decision = (action === 'buy' || action === 'add') ? 'BUY' : 'HOLD';
         const confidence = action === 'buy' ? '高' : (action === 'add' ? '中' : '低');
+        logAi('signal', { user: (userConfigs[userId]||{}).name || userId, code: fundCode, action, decision, confidence, nav: currentNav, dailyReturn: dailyReturn.toFixed(2), message: `${fundCode} 信号=${action}（置信度${confidence}） 日涨跌${dailyReturn.toFixed(2)}% → ${decision}` });
         
         // 预估收盘涨跌幅用真实最新日涨跌，不再随机
         const estimatedCloseReturn = dailyReturn;
@@ -3444,12 +3474,14 @@ async function performAnalysis(analysisType, auto = false) {
                   if (!rc.pass) {
                     logRiskEvent(userId, 'BUY_BLOCKED', fundCode, rc.reason, 'block');
                     console.log(`  → 风控拦截买入 ${fundCode}: ${rc.reason}`);
+                    logAi('block', { user: (userConfigs[userId]||{}).name || userId, code: fundCode, message: `🚫 风控拦截 ${fundCode}: ${rc.reason}` });
                   } else {
                     const order = await orderEngine.createOrder({ db, audit }, {
                       userId, fundCode, orderType: 'BUY', amount: suggestAmount2, price: currentNav,
                       reason: `AI自动建仓：${sig.signal.label}（${sig.signal.reason}）`
                     });
                     console.log(`  → 生成建仓订单#${order.id} ${fundCode} ¥${suggestAmount2}（T+1确认）`);
+                    logAi('order', { user: (userConfigs[userId]||{}).name || userId, code: fundCode, action: 'BUY', amount: suggestAmount2, orderId: order.id, message: `📈 建仓订单#${order.id} ${fundCode} ¥${suggestAmount2}` });
                   }
                 } else {
                   console.log(`  → ${fundCode} 可用现金不足（¥${portfolio.current_capital}），跳过建仓`);

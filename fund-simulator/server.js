@@ -401,8 +401,10 @@ const userConfigs = {
   }
 };
 
-// 当前活跃用户
+// 当前活跃用户（拆 routes 时用 getter/setter 保持引用）
 let currentUser = 'default';
+const getCurrentUser = () => currentUser;
+const setCurrentUser = (v) => { currentUser = v; };
 
 // 初始化用户数据（从数据库加载）
 function initializeUserData() {
@@ -2863,139 +2865,7 @@ app.get('/api/ai/hotspots', async (req, res) => {
 });
 
 // 用户管理API
-app.get('/api/users', async (req, res) => {
-  const users = Object.values(userConfigs).map(user => ({
-    id: user.id,
-    name: user.name,
-    avatar: user.avatar,
-    style: user.style,
-    description: user.description
-  }));
-  res.json(users);
-});
-
-// 获取当前用户
-app.get('/api/users/current', (req, res) => {
-  const user = userConfigs[currentUser];
-  res.json({
-    id: user.id,
-    name: user.name,
-    avatar: user.avatar,
-    style: user.style,
-    description: user.description,
-    risk_tolerance: user.risk_tolerance,
-    target_return: user.target_return,
-    stop_loss: user.stop_loss,
-    max_position: user.max_position
-  });
-});
-
-// 切换用户
-app.post('/api/users/switch', (req, res) => {
-  const { user_id } = req.body;
-  
-  if (!userConfigs[user_id]) {
-    return res.status(404).json({ error: '用户不存在' });
-  }
-  
-  currentUser = user_id;
-  
-  res.json({
-    message: '切换成功',
-    user: {
-      id: userConfigs[user_id].id,
-      name: userConfigs[user_id].name,
-      avatar: userConfigs[user_id].avatar,
-      style: userConfigs[user_id].style
-    }
-  });
-});
-
-// 获取用户观察池（真实净值）
-app.get('/api/users/:id/watchlist', async (req, res) => {
-  const { id } = req.params;
-  if (!userConfigs[id]) return res.status(404).json({ error: '用户不存在' });
-  try {
-    const list = await getWatchlist(id);
-    res.json(list);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 添加自选基金
-app.post('/api/users/:id/watchlist', async (req, res) => {
-  const { id } = req.params;
-  const { fund_code, reason } = req.body || {};
-  if (!userConfigs[id]) return res.status(404).json({ error: '用户不存在' });
-  if (!fund_code) return res.status(400).json({ error: '基金代码不能为空' });
-
-  try {
-    // 校验基金：优先系统跟踪库 funds；不在则查全市场基金库 fund_universe，自动入库并拉取历史净值
-    let fund = await new Promise((resolve, reject) => {
-      db.get('SELECT fund_code FROM funds WHERE fund_code = ?', [fund_code], (err, row) => {
-        if (err) reject(err); else resolve(row);
-      });
-    });
-    if (!fund) {
-      const urow = await new Promise((resolve, reject) => {
-        db.get('SELECT fund_code, fund_name, fund_type FROM fund_universe WHERE fund_code = ?', [fund_code], (err, row) => {
-          if (err) reject(err); else resolve(row);
-        });
-      });
-      if (!urow) return res.status(404).json({ error: `基金 ${fund_code} 不在全市场基金库中` });
-      // 入库 + 拉全量历史净值（观察池/信号/交易都依赖）
-      const navN = await ensureFundWithNav({ fund_code: urow.fund_code, fund_name: urow.fund_name, fund_type: urow.fund_type });
-      if (navN < 30) console.warn(`[手动观察] ${fund_code} 净值仅 ${navN} 条，信号可能不完整`);
-    }
-
-    await new Promise((resolve, reject) => {
-      db.run('INSERT OR IGNORE INTO watchlist (user_id, fund_code, reason) VALUES (?, ?, ?)',
-        [id, fund_code, reason || ''], err => err ? reject(err) : resolve());
-    });
-    res.json({ message: '已添加自选', watchlist: await getWatchlist(id) });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 取消自选基金
-app.delete('/api/users/:id/watchlist/:fundCode', async (req, res) => {
-  const { id, fundCode } = req.params;
-  if (!userConfigs[id]) return res.status(404).json({ error: '用户不存在' });
-  try {
-    await new Promise((resolve, reject) => {
-      db.run('DELETE FROM watchlist WHERE user_id = ? AND fund_code = ?', [id, fundCode], err => err ? reject(err) : resolve());
-    });
-    res.json({ message: '已取消自选', watchlist: await getWatchlist(id) });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 获取用户基金列表
-app.get('/api/users/:id/funds', (req, res) => {
-  const { id } = req.params;
-  
-  if (!userConfigs[id]) {
-    return res.status(404).json({ error: '用户不存在' });
-  }
-  
-  res.json(userConfigs[id].fund_list);
-});
-
-// 获取用户配置
-app.get('/api/users/:id/config', (req, res) => {
-  const { id } = req.params;
-  
-  if (!userConfigs[id]) {
-    return res.status(404).json({ error: '用户不存在' });
-  }
-  
-  res.json(userConfigs[id]);
-});
-
-// 获取分析记录（存档）
+// /api/users/* 路由已抽到 routes/users.js
 app.get('/api/analysis/logs', async (req, res) => {
   try {
     const userId = req.query.user_id || currentUser;
@@ -3676,6 +3546,11 @@ app.use(express.static(path.join(__dirname, 'frontend/dist')));
 
 // 静态文件服务（放在API路由之后）
 app.use(express.static('public'));
+
+// 挂载用户路由（必须在 SPA fallback 之前）
+app.use('/api/users', require('./routes/users')({
+  db, userConfigs, getCurrentUser, setCurrentUser, getWatchlist, ensureFundWithNav
+}));
 
 // 其他请求兜底返回 Vue index.html
 app.use((req, res) => {

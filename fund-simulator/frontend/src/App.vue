@@ -357,6 +357,8 @@ body {
 
 .app-main {
   width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
   padding: 24px;
   flex: 1;
 }

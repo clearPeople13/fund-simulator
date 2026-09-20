@@ -346,29 +346,23 @@ module.exports = function aiRoutes(ctx) {
         };
         await saveAnalysisResult(userId, code, analysisResults[code]);
         
-        // AI 自动交易：BUY → 自动买入（仅在交易时间执行）
+        // AI 自动交易：BUY → 走 order-engine 生成订单（T+1 确认，不直接落账）
         if (aiDecision === 'BUY') {
           if (!isTradingTime()) {
             console.log(`[AI交易] ${userId} ${code} AI 建议买入，但当前非交易时间，跳过交易（仅记录分析）`);
           } else {
-          console.log(`[AI交易] ${userId} ${code} AI 建议买入，自动执行...`);
+          console.log(`[AI交易] ${userId} ${code} AI 建议买入，生成订单（T+1确认）...`);
           try {
-            // 买入金额：总资产的 5%
+            const { createOrder } = require('../engine/order-engine');
             const portfolio = await getUserPortfolio(userId);
             const buyAmount = portfolio.total_assets * 0.05;
-            const shares = buyAmount / entry;
-            
-            // 保存交易记录
-            db.run('INSERT INTO transactions (user_id, fund_code, transaction_type, amount, price, shares, transaction_date) VALUES (?, ?, "BUY", ?, ?, ?, strftime("%s", "now") * 1000)',
-              [userId, code, buyAmount, entry, shares]);
-            
-            // 更新持仓
-            db.run('INSERT INTO holdings (user_id, fund_code, shares, cost, updated_at) VALUES (?, ?, ?, ?, datetime("now")) ON CONFLICT(user_id, fund_code) DO UPDATE SET shares = shares + ?, cost = cost + ?, updated_at = datetime("now")',
-              [userId, code, shares, buyAmount, shares, buyAmount]);
-            
-            console.log(`[AI交易] ${userId} ${code} 买入成功：¥${buyAmount.toFixed(2)}，${shares.toFixed(2)} 份`);
+            const order = await createOrder({ db, saveTransaction: require('../services/portfolio').saveTransaction, updateHolding: require('../services/portfolio').updateHolding, getUserPortfolio }, {
+              userId, fundCode: code, orderType: 'BUY', amount: buyAmount, price: entry,
+              reason: `AI分析建议买入（${sig.confidence || '中'}信心度）`
+            });
+            console.log(`[AI交易] ${userId} ${code} 订单#${order.id} 已提交：¥${buyAmount.toFixed(2)}（T+1确认）`);
           } catch (tradeErr) {
-            console.error(`[AI交易] ${code} 买入失败: ${tradeErr.message}`);
+            console.error(`[AI交易] ${code} 下单失败: ${tradeErr.message}`);
           }
           } // end isTradingTime else
         }

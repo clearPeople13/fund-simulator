@@ -1453,6 +1453,10 @@ onMounted(() => {
               <span v-else class="watch-date">—</span>
             </div>
             <div class="watch-date" v-if="fund.nav_date">{{ fund.nav_date }} 净值</div>
+            <!-- AI 分析理由 -->
+            <div class="watch-ai-reason" v-if="fund.ai_reason" title="AI 分析理由">
+              🤖 {{ fund.ai_reason }}
+            </div>
             <div class="watch-signal-row">
               <span class="watch-signal" :class="signalClass(fund.signal.action)">{{ fund.signal.label }}</span>
               <span class="watch-metrics">

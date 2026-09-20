@@ -1371,6 +1371,13 @@ function schedulePostCloseConfirmation() {
   const run = () => {
     confirmPendingOrders({ db, saveTransaction, updateHolding, audit }).then(r => {
       console.log(`[订单确认] 完成 ${r.confirmed} 笔` + (r.errors.length ? `，错误: ${r.errors.join('; ')}` : ''));
+      // 飞书通知：订单确认完成
+      if (r.confirmed > 0) {
+        try {
+          const { sendFeishu } = require('./notify');
+          sendFeishu('订单确认完成', `T+1 确认 ${r.confirmed} 笔订单已落账`);
+        } catch (e) { console.error('[飞书] 订单确认通知失败: ' + e.message); }
+      }
     }).catch(e => console.error('[订单确认] 失败:', e.message));
   };
   const now = new Date();
@@ -1785,6 +1792,14 @@ async function autoDiscoverOnStartup() {
   try {
     for (const userId of Object.keys(userConfigs)) {
       const result = await aiDiscoverWatchlist(userId);
+      // 飞书通知：观察池新基金
+      if (result && result.newFunds && result.newFunds.length > 0) {
+        try {
+          const { sendFeishu } = require('./notify');
+          const names = result.newFunds.map(f => f.fund_code + ' ' + (f.fund_name || '')).join(', ');
+          sendFeishu('观察池新增基金', userId + ' 新发现：' + names);
+        } catch (e) { console.error('[飞书] 观察池通知失败: ' + e.message); }
+      }
       if (result.inserted.length > 0) {
         console.log(`[AI自动选基] ${userConfigs[userId].name}（${userConfigs[userId].style}）新增观察: ${result.inserted.join(', ')}`);
       } else {

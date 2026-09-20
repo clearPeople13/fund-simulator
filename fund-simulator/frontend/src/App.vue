@@ -17,6 +17,9 @@ import axios from 'axios'
 const router = useRouter()
 const route = useRoute()
 
+// 全局分析模式：rule（规则引擎）| ai（MIMO Pro 2.5）
+const analysisMode = ref<'rule' | 'ai'>('rule')
+
 // 导航菜单高亮跟随当前路由（切换用户刷新后仍保持正确对应）
 const activeIndex = computed(() => {
   const p = route.path
@@ -155,6 +158,21 @@ onMounted(() => {
             </a-menu-item>
           </a-menu>
           <div class="header-right">
+            <!-- 全局模式切换：规则 / AI -->
+            <div class="global-mode-switch" @click.stop>
+              <button 
+                class="global-mode-btn" 
+                :class="{ active: analysisMode === 'rule' }"
+                @click="analysisMode = 'rule'"
+                title="规则引擎模式"
+              >规则</button>
+              <button 
+                class="global-mode-btn ai" 
+                :class="{ active: analysisMode === 'ai' }"
+                @click="analysisMode = 'ai'"
+                title="MIMO Pro 2.5 AI 模式"
+              >🤖 AI</button>
+            </div>
             <a-dropdown trigger="click">
               <div class="user-switcher">
                 <span class="user-avatar">{{ currentUser.avatar }}</span>

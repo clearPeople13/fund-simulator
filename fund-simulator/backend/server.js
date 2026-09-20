@@ -794,7 +794,12 @@ async function computePerformance(userId, dateStr) {
 }
 
 // 生成报告（周报/月报），写入 reports 表；内容与交易流水/快照可对账
-async function generateReport(userId, reportType) {
+async function generateReport(userId, reportType, mode = 'rule') {
+  // AI 模式：让 MIMO Pro 2.5 写复盘
+  if (mode === 'ai') {
+    return await generateReportByAI(userId, reportType);
+  }
+  // 规则模式：原来的模板生成（保留不动）
   const cfg = userConfigs[userId] || {};
   const now = new Date();
   let period, rangeDesc;
@@ -1497,14 +1502,63 @@ function getVolatility(code) {
 
 // 观察池互斥锁：避免启动自动选基与用户手动触发/定时分析并发竞态（先删后插必须串行）
 let discoverLock = null;
-async function aiDiscoverWatchlist(userId) {
+async function aiDiscoverWatchlist(userId, mode = 'rule') {
   while (discoverLock) await new Promise(r => setTimeout(r, 400));
   discoverLock = true;
   try {
+    if (mode === 'ai') {
+      // AI 模式：先规则筛选候选，再让 MIMO Pro 2.5 精选
+      return await aiDiscoverWatchlistByAI(userId);
+    }
+    // 规则模式：原来的规则筛选（保留不动）
     return await aiDiscoverWatchlistInner(userId);
   } finally {
     discoverLock = false;
   }
+}
+
+// AI 模式选基：MIMO Pro 2.5 从候选池中精选
+async function aiDiscoverWatchlistByAI(userId) {
+  const user = userConfigs[userId];
+  if (!user) throw new Error('用户不存在');
+  const style = user.style || '稳健型';
+  
+  // 先规则筛选出候选（100 只）
+  const candidates = await aiDiscoverWatchlistInner(userId, true); // true = 返回候选不插入
+  if (!candidates || candidates.length === 0) return 0;
+  
+  // 让 MIMO Pro 2.5 从中选 20 只
+  const { callMIMO } = require('./ai-advisor');
+  const prompt = `你是一位专业的基金经理，管理${style}风格的组合。
+从以下候选基金中选出 20 只最值得关注的基金：
+${candidates.slice(0, 50).map((c, i) => `${i+1}. ${c.fund_name}（${c.fund_code}），近1年涨幅 ${c.r1y}%，近3月涨幅 ${c.r3m}%`).join('\n')}
+
+请返回 JSON 数组，包含选中的基金代码：
+["005827", "161725", ...]`;
+  
+  const result = await callMIMO('你是专业基金经理', prompt);
+  if (!result) return 0;
+  
+  try {
+    const jsonMatch = result.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const selected = JSON.parse(jsonMatch[0]);
+      // 插入观察池
+      for (const code of selected.slice(0, 20)) {
+        const fund = candidates.find(c => c.fund_code === code);
+        if (fund) {
+          await new Promise((resolve, reject) => {
+            db.run('INSERT OR REPLACE INTO watchlist (user_id, fund_code, source, reason, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
+              [userId, code, 'ai', 'AI精选（MIMO Pro 2.5）'], e => e ? reject(e) : resolve());
+          });
+        }
+      }
+      return selected.length;
+    }
+  } catch (e) {
+    console.error('[AI选基] 解析失败: ' + e.message);
+  }
+  return 0;
 }
 
 // AI 按用户性格从全市场自主选基并维护观察池（source='ai'，上限 KEEP 只；手动项永不删除；只影响观察池，不涉及交易）
@@ -2490,6 +2544,57 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // 启动服务器
+// AI 模式生成复盘：MIMO Pro 2.5 写复盘报告
+async function generateReportByAI(userId, reportType) {
+  const cfg = userConfigs[userId] || {};
+  const now = new Date();
+  let period, rangeDesc;
+  const dateStr = getLocalDateStr();
+  if (reportType === 'weekly') {
+    const d = new Date(now); d.setDate(d.getDate() - 7);
+    period = d.toISOString().slice(0, 10) + ' ~ ' + dateStr;
+    rangeDesc = '近7天';
+  } else {
+    const d = new Date(now); d.setDate(d.getDate() - 30);
+    period = d.toISOString().slice(0, 10) + ' ~ ' + dateStr;
+    rangeDesc = '近30天';
+  }
+  
+  const pf = await getUserPortfolio(userId);
+  const perf = await new Promise((resolve) => {
+    db.get('SELECT * FROM performance_daily WHERE user_id = ? ORDER BY date DESC LIMIT 1', [userId], (err, row) => resolve(err ? null : row));
+  });
+  
+  const { callMIMO } = require('./ai-advisor');
+  const prompt = `你是一位专业的基金经理，管理${cfg.style || '稳健型'}风格的组合。
+请根据以下数据写一份${rangeDesc}复盘报告：
+
+账户数据：
+- 总资产：¥${pf.total_assets || 0}
+- 累计收益：¥${pf.total_profit || 0}
+- 收益率：${((pf.total_profit / 100000) * 100).toFixed(2)}%
+
+持仓：
+${Object.entries(pf.holdings || {}).map(([code, h]) => `- ${code}：${h.shares} 份，市值 ¥${h.market_value || 0}`).join('\n')}
+
+请写一份简洁的复盘报告（200字以内），包括：
+1. 本周/本月表现总结
+2. 操作回顾
+3. 下周/下月计划`;
+  
+  const reportContent = await callMIMO('你是专业基金经理，写简洁的复盘报告', prompt);
+  if (!reportContent) return null;
+  
+  return {
+    user_id: userId,
+    type: reportType,
+    period: period,
+    content: reportContent,
+    generated_at: now.toISOString(),
+    source: 'ai'
+  };
+}
+
 app.listen(PORT, () => {
   console.log(`基金模拟系统服务器运行在 http://localhost:${PORT}`);
   console.log('');

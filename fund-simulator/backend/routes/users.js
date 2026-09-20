@@ -70,8 +70,9 @@ module.exports = function usersRoutes(ctx) {
     const { id, fundCode } = req.params;
     if (!userConfigs[id]) return res.status(404).json({ error: '用户不存在' });
     try {
+      // 软删除：标记 deleted_by_user=1，AI 不再重新添加
       await new Promise((resolve, reject) => {
-        db.run('DELETE FROM watchlist WHERE user_id = ? AND fund_code = ?', [id, fundCode], e => e ? reject(e) : resolve());
+        db.run('UPDATE watchlist SET deleted_by_user = 1 WHERE user_id = ? AND fund_code = ?', [id, fundCode], e => e ? reject(e) : resolve());
       });
       res.json({ message: '已取消自选', watchlist: await getWatchlist(id) });
     } catch (e) { res.status(500).json({ error: e.message }); }

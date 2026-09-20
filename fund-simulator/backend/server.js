@@ -145,10 +145,13 @@ function initDatabase() {
       fund_code TEXT NOT NULL,
       reason TEXT,
       source TEXT DEFAULT 'manual',
+      deleted_by_user INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(user_id, fund_code),
       FOREIGN KEY (fund_code) REFERENCES funds (fund_code)
     )`);
+    // 兼容旧表：加 deleted_by_user 字段
+    db.run(`ALTER TABLE watchlist ADD COLUMN deleted_by_user INTEGER DEFAULT 0`, (e) => { if (e && !e.message.includes('duplicate column')) console.error('[watchlist] 加字段失败: ' + e.message); });
 
     db.run(`CREATE TABLE IF NOT EXISTS holidays (
       date TEXT PRIMARY KEY,
@@ -1516,6 +1519,8 @@ async function aiDiscoverWatchlistInner(userId) {
   const existing = await getWatchlist(userId);
   const manualSet = new Set(existing.filter(x => x.source !== 'ai').map(x => x.fund_code));
   const aiSet = new Set(existing.filter(x => x.source === 'ai').map(x => x.fund_code));
+  // 用户已删除的 AI 基金：AI 不再重新添加
+  const deletedSet = new Set(existing.filter(x => x.deleted_by_user === 1).map(x => x.fund_code));
 
   // 跨用户去重：其他用户的观察池（全部来源）与持仓，本用户 AI 不再重复关注（性格分工）
   const otherWatchSet = await new Promise((resolve) => {
@@ -1546,6 +1551,7 @@ async function aiDiscoverWatchlistInner(userId) {
     if (f.scale != null && f.scale < MIN_SCALE) continue;
     if (f.inception_date && f.inception_date > CUTOFF_DATE) continue;
     if (manualSet.has(f.fund_code)) continue;
+    if (deletedSet.has(f.fund_code)) continue;
     if (otherWatchSet.has(f.fund_code)) continue;
     if (otherHoldSet.has(f.fund_code)) continue;
 

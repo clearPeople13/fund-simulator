@@ -3682,6 +3682,9 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/dist', 'index.html'));
 });
 
+// 统一错误处理中间件（必须最后挂）
+app.use(errorHandler);
+
 // 启动服务器
 app.listen(PORT, () => {
   console.log(`基金模拟系统服务器运行在 http://localhost:${PORT}`);

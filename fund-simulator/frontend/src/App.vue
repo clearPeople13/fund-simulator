@@ -241,6 +241,7 @@ body {
   margin: 0 auto;
   gap: 16px;
   padding: 12px 0;
+  flex-wrap: nowrap;
 }
 
 .logo {

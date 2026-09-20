@@ -900,6 +900,13 @@ const initDetailChart = () => {
 onMounted(() => {
   loadAllData()
   connectSSE()
+  // 全局图表自适应：窗口变化时所有 ECharts 实例 resize
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('[_echarts_instance_]').forEach((el: any) => {
+      const inst = echarts.getInstanceByDom(el)
+      if (inst) inst.resize()
+    })
+  })
 })
 </script>
 

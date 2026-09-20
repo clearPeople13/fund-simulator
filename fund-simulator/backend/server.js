@@ -2403,8 +2403,10 @@ async function performAnalysis(analysisType, auto = false) {
           }
         } catch (p1Err) { console.error(`[P1] ${userId} 失败:`, p1Err.message); }
       }
-      // 每日复盘（每日收盘后）
-      try { await generateDailyRecap(); } catch (e) { console.error('[复盘] 失败:', e.message); }
+      // 每日复盘（仅收盘分析时生成，避免盘中每30分钟重复生成）
+      if (analysisType === 'close') {
+        try { await generateDailyRecap(); } catch (e) { console.error('[复盘] 失败:', e.message); }
+      }
     }
 
     console.log(`\n=== ${typeNames[analysisType]}完成 ===\n`);

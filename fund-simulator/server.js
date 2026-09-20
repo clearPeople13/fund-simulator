@@ -1861,137 +1861,7 @@ function saveAnalysisResult(userId, fundCode, result) {
   });
 }
 
-// 触发AI分析
-app.post('/api/ai/analyze', async (req, res) => {
-  try {
-    let { fund_codes, user_id } = req.body;
-    const userId = user_id || currentUser;
-
-    if (!userConfigs[userId]) {
-      return res.status(404).json({ error: '用户不存在' });
-    }
-
-    // 候选池 = 观察池：未指定或传空时，取该用户的观察池代码
-    if (!fund_codes || !Array.isArray(fund_codes) || fund_codes.length === 0) {
-      fund_codes = await getUserWatchlistCodes(userId);
-    }
-
-    if (fund_codes.length === 0) {
-      return res.json({
-        message: '观察池为空，请先在基金库中添加自选基金',
-        results: {},
-        trades: []
-      });
-    }
-
-    // 更新分析状态
-    aiAnalysisStatus.status = 'running';
-    aiAnalysisStatus.progress = 0;
-    aiAnalysisStatus.currentPhase = '开始分析...';
-
-    // 基于真实信号分析观察池中的每只基金
-    const analysisResults = {};
-    const signals = {};
-
-    for (let i = 0; i < fund_codes.length; i++) {
-      const code = fund_codes[i];
-      aiAnalysisStatus.progress = Math.round(((i + 1) / fund_codes.length) * 100);
-      aiAnalysisStatus.currentPhase = `分析 ${code}...`;
-
-      const sig = await getFundSignal(code);
-      signals[code] = sig;
-
-      if (!sig || !sig.signal || sig.latest_nav == null) {
-        analysisResults[code] = {
-          decision: 'HOLD',
-          confidence: '低',
-          entry_price: 0,
-          target_price: 0,
-          stop_loss: 0,
-          analysis_time: new Date().toISOString(),
-          signal_label: '数据不足',
-          signal_reason: '暂无足够净值数据，无法分析',
-          change_5d: null,
-          change_20d: null,
-          drawdown_60d: null,
-          above_ma20: null
-        };
-        await saveAnalysisResult(userId, code, analysisResults[code]);
-        continue;
-      }
-
-      const action = sig.signal.action;
-      const entry = sig.latest_nav;
-      analysisResults[code] = {
-        decision: (action === 'buy' || action === 'add') ? 'BUY' : 'HOLD',
-        confidence: action === 'buy' ? '高' : (action === 'add' ? '中' : '低'),
-        entry_price: entry,
-        target_price: Number((entry * 1.1).toFixed(4)),
-        stop_loss: Number((entry * 0.95).toFixed(4)),
-        analysis_time: new Date().toISOString(),
-        signal_label: sig.signal.label,
-        signal_reason: sig.signal.reason,
-        change_5d: sig.change_5d,
-        change_20d: sig.change_20d,
-        drawdown_60d: sig.drawdown_60d,
-        above_ma20: sig.above_ma20,
-        nav_date: sig.nav_date,
-        daily_return: sig.daily_return
-      };
-      await saveAnalysisResult(userId, code, analysisResults[code]);
-    }
-
-    // 更新状态
-    aiAnalysisStatus.status = 'completed';
-    aiAnalysisStatus.lastAnalysis = new Date().toISOString();
-    aiAnalysisStatus.progress = 100;
-    aiAnalysisStatus.currentPhase = '分析完成';
-    aiAnalysisResults = analysisResults;
-
-    // 只出建议供查看，系统不执行任何交易
-    const suggestions = [];
-    const portfolio = await getUserPortfolio(userId);
-
-    for (const [code, result] of Object.entries(analysisResults)) {
-      if (result.decision !== 'BUY') continue;
-      const sig = signals[code];
-      if (!sig || sig.latest_nav == null || sig.latest_nav <= 0) continue;
-
-      const action = sig.signal.action;
-      // 分批建仓(强信号)建议20%仓位，逢低加仓/轻仓试探建议10%
-      const buyRatio = action === 'buy' ? 0.2 : 0.1;
-      const suggestAmount = Math.round(portfolio.current_capital * buyRatio);
-      result.suggest_amount = suggestAmount;
-      suggestions.push({
-        fund_code: code,
-        signal: action,
-        amount: suggestAmount,
-        reason: sig.signal.reason
-      });
-      console.log(`AI分析建议买入（未执行）: ${code}（${action}）, 建议金额: ¥${suggestAmount}`);
-    }
-
-    const suggestCodes = suggestions.map(s => s.fund_code);
-    res.json({
-      message: suggestions.length > 0
-        ? `分析完成：观察池 ${fund_codes.length} 只中 ${suggestions.length} 只出现入场信号（${suggestCodes.join('、')}），仅供查看参考，系统不执行交易`
-        : `分析完成：观察池 ${fund_codes.length} 只均无入场信号，建议继续观望`,
-      results: analysisResults,
-      suggestions: suggestions,
-      portfolio: {
-        current_capital: portfolio.current_capital,
-        holdings: portfolio.holdings
-      },
-      analysis_time: aiAnalysisStatus.lastAnalysis
-    });
-    
-  } catch (error) {
-    aiAnalysisStatus.status = 'error';
-    aiAnalysisStatus.currentPhase = '分析失败: ' + error.message;
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// /api/ai/analyze 已抽到 routes/ai.js
 // AI 按当前用户性格自主选基进观察池（只读系统：只影响观察池，不涉及任何交易）
 app.post('/api/ai/discover-watchlist', async (req, res) => {
   try {
@@ -2793,7 +2663,7 @@ app.use(express.static(path.join(__dirname, 'frontend/dist')));
 app.use(express.static('public'));
 
 // 挂载 AI 核心路由（必须在 SPA fallback 之前）
-app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist }));
+app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults, getFundSignal, saveAnalysisResult }));
 
 // 挂载系统/SSE 路由（必须在 SPA fallback 之前）
 app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser }));

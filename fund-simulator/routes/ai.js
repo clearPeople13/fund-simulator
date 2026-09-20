@@ -1,12 +1,16 @@
 /**
- * AI 核心查询路由：/api/ai/portfolio /api/ai/compare /api/ai/transactions /api/ai/hotspots
- * ctx: { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist }
+ * AI 核心路由：/api/ai/portfolio /compare /transactions /hotspots /discover-watchlist /analyze
+ * ctx: { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots,
+ *        aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults,
+ *        getFundSignal, saveAnalysisResult }
  */
 const { Router } = require('express');
 
 module.exports = function aiRoutes(ctx) {
   const r = Router();
-  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist } = ctx;
+  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots,
+          aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults,
+          getFundSignal, saveAnalysisResult } = ctx;
 
   // 获取AI持仓
   r.get('/portfolio', async (req, res) => {
@@ -185,6 +189,86 @@ module.exports = function aiRoutes(ctx) {
       const data = await buildHotspots(userId);
       res.json(data);
     } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // 触发AI分析
+  r.post('/analyze', async (req, res) => {
+    try {
+      let { fund_codes, user_id } = req.body;
+      const userId = user_id || getCurrentUser();
+      if (!userConfigs[userId]) return res.status(404).json({ error: '用户不存在' });
+      if (!fund_codes || !Array.isArray(fund_codes) || fund_codes.length === 0) {
+        fund_codes = await getUserWatchlistCodes(userId);
+      }
+      if (fund_codes.length === 0) {
+        return res.json({ message: '观察池为空，请先在基金库中添加自选基金', results: {}, trades: [] });
+      }
+      aiAnalysisStatus.status = 'running';
+      aiAnalysisStatus.progress = 0;
+      aiAnalysisStatus.currentPhase = '开始分析...';
+      const analysisResults = {};
+      const signals = {};
+      for (let i = 0; i < fund_codes.length; i++) {
+        const code = fund_codes[i];
+        aiAnalysisStatus.progress = Math.round(((i + 1) / fund_codes.length) * 100);
+        aiAnalysisStatus.currentPhase = `分析 ${code}...`;
+        const sig = await getFundSignal(code);
+        signals[code] = sig;
+        if (!sig || !sig.signal || sig.latest_nav == null) {
+          analysisResults[code] = {
+            decision: 'HOLD', confidence: '低', entry_price: 0, target_price: 0, stop_loss: 0,
+            analysis_time: new Date().toISOString(), signal_label: '数据不足',
+            signal_reason: '暂无足够净值数据，无法分析',
+            change_5d: null, change_20d: null, drawdown_60d: null, above_ma20: null
+          };
+          await saveAnalysisResult(userId, code, analysisResults[code]);
+          continue;
+        }
+        const action = sig.signal.action;
+        const entry = sig.latest_nav;
+        analysisResults[code] = {
+          decision: (action === 'buy' || action === 'add') ? 'BUY' : 'HOLD',
+          confidence: action === 'buy' ? '高' : (action === 'add' ? '中' : '低'),
+          entry_price: entry, target_price: Number((entry * 1.1).toFixed(4)),
+          stop_loss: Number((entry * 0.95).toFixed(4)),
+          analysis_time: new Date().toISOString(),
+          signal_label: sig.signal.label, signal_reason: sig.signal.reason,
+          change_5d: sig.change_5d, change_20d: sig.change_20d,
+          drawdown_60d: sig.drawdown_60d, above_ma20: sig.above_ma20,
+          nav_date: sig.nav_date, daily_return: sig.daily_return
+        };
+        await saveAnalysisResult(userId, code, analysisResults[code]);
+      }
+      aiAnalysisStatus.status = 'completed';
+      aiAnalysisStatus.lastAnalysis = new Date().toISOString();
+      aiAnalysisStatus.progress = 100;
+      aiAnalysisStatus.currentPhase = '分析完成';
+      const suggestions = [];
+      const portfolio = await getUserPortfolio(userId);
+      for (const [code, result] of Object.entries(analysisResults)) {
+        if (result.decision !== 'BUY') continue;
+        const sig = signals[code];
+        if (!sig || sig.latest_nav == null || sig.latest_nav <= 0) continue;
+        const action = sig.signal.action;
+        const buyRatio = action === 'buy' ? 0.2 : 0.1;
+        const suggestAmount = Math.round(portfolio.current_capital * buyRatio);
+        result.suggest_amount = suggestAmount;
+        suggestions.push({ fund_code: code, signal: action, amount: suggestAmount, reason: sig.signal.reason });
+      }
+      const suggestCodes = suggestions.map(s => s.fund_code);
+      res.json({
+        message: suggestions.length > 0
+          ? `分析完成：观察池 ${fund_codes.length} 只中 ${suggestions.length} 只出现入场信号（${suggestCodes.join('、')}），仅供查看参考，系统不执行交易`
+          : `分析完成：观察池 ${fund_codes.length} 只均无入场信号，建议继续观望`,
+        results: analysisResults, suggestions,
+        portfolio: { current_capital: portfolio.current_capital, holdings: portfolio.holdings },
+        analysis_time: aiAnalysisStatus.lastAnalysis
+      });
+    } catch (error) {
+      aiAnalysisStatus.status = 'error';
+      aiAnalysisStatus.currentPhase = '分析失败: ' + error.message;
+      res.status(500).json({ error: error.message });
+    }
   });
 
   return r;

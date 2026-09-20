@@ -224,8 +224,6 @@ body {
   background: linear-gradient(90deg, #131a35 0%, #1d2452 55%, #2a3370 100%);
   color: white;
   padding: 0 24px;
-  height: 64px;
-  line-height: 64px;
   box-shadow: 0 4px 24px rgba(99, 102, 241, 0.25);
   border-bottom: 1px solid rgba(129, 140, 248, 0.25);
   position: sticky;
@@ -238,10 +236,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 100%;
   max-width: 1400px;
   margin: 0 auto;
   gap: 16px;
+  padding: 12px 0;
 }
 
 .logo {
@@ -264,7 +262,7 @@ body {
   border: none !important;
   flex: 0 1 auto;
   margin-left: 20px;
-  line-height: 62px;
+  line-height: normal;
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;

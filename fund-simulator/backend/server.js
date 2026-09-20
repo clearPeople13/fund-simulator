@@ -1524,7 +1524,14 @@ async function aiDiscoverWatchlistByAI(userId) {
   const style = user.style || '稳健型';
   
   // 先规则筛选出候选（100 只）
-  const candidates = await aiDiscoverWatchlistInner(userId, true); // true = 返回候选不插入
+  const candidates = await new Promise((resolve, reject) => {
+    db.all('SELECT fund_code, fund_name, r1y, r3m FROM fund_universe WHERE scale >= 2 AND inception_date < "2025-09-18" LIMIT 100',
+      (err, rows) => {
+        if (err) { console.error('[AI选基] 查询失败: ' + err.message); resolve([]); }
+        else { console.log('[AI选基] 候选数量: ' + rows.length); resolve(rows); }
+      });
+  });
+  console.log('[AI选基] candidates type: ' + Array.isArray(candidates));
   if (!candidates || candidates.length === 0) return 0;
   
   // 让 MIMO Pro 2.5 从中选 20 只

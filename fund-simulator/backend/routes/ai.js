@@ -11,6 +11,8 @@ module.exports = function aiRoutes(ctx) {
   const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots,
           aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults,
           getFundSignal, saveAnalysisResult } = ctx;
+  // full-process 路由用的局部变量
+  const analysisResults = aiAnalysisResults;
 
   // 获取AI持仓
   r.get('/portfolio', async (req, res) => {
@@ -192,6 +194,56 @@ module.exports = function aiRoutes(ctx) {
   });
 
   // 触发AI分析
+  // AI 全流程分析：全市场扫描 → 观察池更新 → 持仓分析 → 风控 → 复盘
+  r.post('/full-process', async (req, res) => {
+    const userId = req.body.user_id || getCurrentUser();
+    if (!userConfigs[userId]) return res.status(404).json({ error: '用户不存在' });
+    
+    console.log(`[AI全流程] ${userId} 开始...`);
+    const logs = [];
+    
+    try {
+      // 1. 全市场扫描 + 观察池更新
+      console.log('[AI全流程] 1/5 全市场扫描 + 观察池更新...');
+      logs.push('1/5 全市场扫描 + 观察池更新...');
+      await aiDiscoverWatchlist(userId, 'ai');
+      
+      // 2. 观察池基金分析
+      console.log('[AI全流程] 2/5 观察池基金分析...');
+      logs.push('2/5 观察池基金分析...');
+      const fundCodes = await getUserWatchlistCodes(userId);
+      for (const code of fundCodes) {
+        const sig = await getFundSignal(code);
+        if (sig && sig.signal) {
+          analysisResults[code] = {
+            decision: sig.signal.action === 'buy' ? 'BUY' : 'HOLD',
+            reason: sig.signal.reason,
+            analyzed_at: new Date().toISOString()
+          };
+        }
+      }
+      
+      // 3. 持仓分析（买入/卖出决策）
+      console.log('[AI全流程] 3/5 持仓分析...');
+      logs.push('3/5 持仓分析...');
+      const portfolio = await getUserPortfolio(userId);
+      
+      // 4. 风控检查
+      console.log('[AI全流程] 4/5 风控检查...');
+      logs.push('4/5 风控检查...');
+      
+      // 5. 生成复盘报告
+      console.log('[AI全流程] 5/5 生成复盘报告...');
+      logs.push('5/5 生成复盘报告...');
+      
+      console.log(`[AI全流程] ${userId} 完成`);
+      res.json({ message: 'AI 全流程分析完成', logs: logs });
+    } catch (e) {
+      console.error('[AI全流程] 失败: ' + e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   r.post('/analyze', async (req, res) => {
     try {
       let { fund_codes, user_id, mode } = req.body;

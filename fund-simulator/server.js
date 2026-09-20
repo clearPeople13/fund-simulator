@@ -2027,21 +2027,7 @@ async function autoDiscoverOnStartup() {
 }
 
 // /api/ai/status 已抽到 routes/system.js
-// 获取AI分析结果
-app.get('/api/ai/results', async (req, res) => {
-  try {
-    const userId = req.query.user_id || currentUser;
-    const results = await getAnalysisResults(userId);
-    
-    res.json({
-      results: results,
-      lastAnalysis: aiAnalysisStatus.lastAnalysis
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// /api/ai/results 已抽到 routes/system.js
 // 获取AI持仓
 app.get('/api/ai/portfolio', async (req, res) => {
   try {
@@ -3136,7 +3122,7 @@ app.use(express.static(path.join(__dirname, 'frontend/dist')));
 app.use(express.static('public'));
 
 // 挂载系统/SSE 路由（必须在 SPA fallback 之前）
-app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay }));
+app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser }));
 
 // 挂载只读查询路由（必须在 SPA fallback 之前）
 app.use('/api', require('./routes/readonly')({ db, getCurrentUser, getRiskParams }));

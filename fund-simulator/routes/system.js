@@ -1,16 +1,24 @@
 /**
- * 系统/SSE 路由：/api/ai/status /api/ai/stream /api/scheduler/status
- * ctx: { aiAnalysisStatus, aiBus, isTradingDay }
+ * 系统/SSE 路由：/api/ai/status /api/ai/stream /api/ai/results /api/scheduler/status
+ * ctx: { aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser }
  */
 const { Router } = require('express');
 
 module.exports = function systemRoutes(ctx) {
   const r = Router();
-  const { aiAnalysisStatus, aiBus, isTradingDay } = ctx;
+  const { aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser } = ctx;
 
-  r.get('/status', (req, res) => res.json(aiAnalysisStatus));
+  r.get('/ai/status', (req, res) => res.json(aiAnalysisStatus));
 
-  r.get('/stream', (req, res) => {
+  r.get('/ai/results', async (req, res) => {
+    try {
+      const userId = req.query.user_id || getCurrentUser();
+      const results = await getAnalysisResults(userId);
+      res.json({ results, lastAnalysis: aiAnalysisStatus.lastAnalysis });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  r.get('/ai/stream', (req, res) => {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

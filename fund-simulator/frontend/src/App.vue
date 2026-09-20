@@ -393,21 +393,21 @@ body {
 
 @media (max-width: 768px) {
   .header-content {
-    flex-direction: column;
+    flex-wrap: wrap;
     padding: 12px 0;
-    height: auto;
   }
 
   .logo {
-    margin-bottom: 8px;
-  }
-
-  .header-menu {
-    width: 100%;
-    margin-left: 0;
+    flex: 1;
   }
 
   .header-right {
+    flex: 0;
+  }
+
+  .header-menu {
+    flex-basis: 100%;
+    margin-left: 0;
     margin-top: 8px;
   }
 }

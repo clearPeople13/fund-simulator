@@ -583,11 +583,14 @@ const triggerManualAnalysis = async () => {
     analysisMessage.value = analyzeRes.data?.message || '分析完成！'
     await loadAllData()
     
+    // 立即重置状态（不要等 2 秒）
+    isAnalyzing.value = false
+    analysisProgress.value = 0
+    analysisMessage.value = analyzeRes.data?.message || ''
+    // 2 秒后清空消息
     setTimeout(() => {
-      isAnalyzing.value = false
-      analysisProgress.value = 0
       analysisMessage.value = ''
-    }, 2000)
+    }, 3000)
     
   } catch (error) {
     console.error('分析失败:', error)

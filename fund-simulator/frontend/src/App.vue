@@ -119,31 +119,31 @@ onMounted(() => {
           >
             <a-menu-item key="/">
               <HomeOutlined />
-              <span>AI操盘</span>
+              <span>首页</span>
             </a-menu-item>
             <a-menu-item key="/funds">
               <UnorderedListOutlined />
-              <span>基金库</span>
+              <span>基金</span>
             </a-menu-item>
             <a-menu-item key="/market">
               <LineChartOutlined />
-              <span>市场行情</span>
+              <span>行情</span>
             </a-menu-item>
             <a-menu-item key="/analysis">
               <BarChartOutlined />
-              <span>AI分析</span>
+              <span>分析</span>
             </a-menu-item>
             <a-menu-item key="/alerts">
               <BellOutlined />
-              <span>预警中心</span>
+              <span>预警</span>
             </a-menu-item>
             <a-menu-item key="/reports">
               <FileTextOutlined />
-              <span>报告中心</span>
+              <span>报告</span>
             </a-menu-item>
             <a-menu-item key="/profile">
               <UserOutlined />
-              <span>基金经理</span>
+              <span>经理</span>
             </a-menu-item>
           </a-menu>
           <div class="header-right">

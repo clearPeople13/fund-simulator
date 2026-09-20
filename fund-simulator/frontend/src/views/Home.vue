@@ -1876,7 +1876,7 @@ onMounted(() => {
 .overview-cards {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
+  gap: 20px;
   margin-bottom: 24px;
 }
 

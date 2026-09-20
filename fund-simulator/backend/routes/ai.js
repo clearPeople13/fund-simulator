@@ -8,7 +8,7 @@ const { Router } = require('express');
 
 module.exports = function aiRoutes(ctx) {
   const r = Router();
-  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots,
+  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, fmtDT,
           aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults,
           getFundSignal, saveAnalysisResult } = ctx;
   // full-process 路由用的局部变量
@@ -28,7 +28,13 @@ module.exports = function aiRoutes(ctx) {
         const lastBuy = await new Promise((resolve) => {
           db.get("SELECT MAX(transaction_date) AS md FROM transactions WHERE user_id = ? AND fund_code = ? AND transaction_type = 'BUY'", [userId, code], (e, row) => resolve(e ? null : row));
         });
-        const pending = !!(lastBuy && lastBuy.md && lastBuy.md.slice(0, 10) === todayStr);
+        // transaction_date 现在是时间戳（毫秒），转成日期字符串比较
+        let pending = false;
+        if (lastBuy && lastBuy.md) {
+          const md = typeof lastBuy.md === 'number' ? new Date(lastBuy.md).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }) : String(lastBuy.md).slice(0, 10);
+          const todayLocal = new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
+          pending = md === todayLocal;
+        }
         const navRow = await new Promise((resolve) => {
           db.get('SELECT unit_nav, nav_date, daily_return FROM fund_nav WHERE fund_code = ? ORDER BY nav_date DESC LIMIT 1', [code], (e, row) => resolve(e ? null : row));
         });
@@ -151,13 +157,8 @@ module.exports = function aiRoutes(ctx) {
         const fund = await new Promise((resolve) => {
           db.get('SELECT fund_name FROM funds WHERE fund_code = ?', [tx.fund_code], (e, row) => resolve(e ? null : row));
         });
-        // 时间戳格式化成北京时间
-        let formattedDate = tx.transaction_date;
-        if (typeof tx.transaction_date === 'number') {
-          const d = new Date(tx.transaction_date);
-          formattedDate = d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-        }
-        enriched.push({ ...tx, fund_name: fund ? fund.fund_name : tx.fund_code, formatted_date: formattedDate });
+        // 统一格式化：时间戳 -> 北京时间字符串（前端直接显示，无需再转）
+        enriched.push({ ...tx, fund_name: fund ? fund.fund_name : tx.fund_code, formatted_date: fmtDT(tx.transaction_date) });
       }
       const pendingRows = await new Promise((resolve, reject) => {
         db.all("SELECT id, fund_code, order_type, amount, shares, price, fee, status, order_date, trade_date, reason FROM orders WHERE user_id = ? AND status = 'SUBMITTED' ORDER BY id DESC", [userId], (e, rows) => e ? reject(e) : resolve(rows || []));

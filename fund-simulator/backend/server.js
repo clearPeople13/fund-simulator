@@ -1,6 +1,20 @@
 const express = require('express');
 const { getUserPortfolio: getUserPortfolioRaw, saveTransaction: saveTransactionRaw, updateHolding: updateHoldingRaw, getAnalysisResults: getAnalysisResultsRaw } = require('./services/portfolio');
 const { buildHotspots: buildHotspotsRaw } = require('./services/hotspots');
+// 统一时间格式化工具：时间戳(ms) -> "2026/09/18 10:24:48" 北京时间
+const fmtDT = (ts) => {
+  if (ts == null) return null;
+  const d = typeof ts === 'number' ? new Date(ts) : new Date(typeof ts === 'string' && /^\d+$/.test(ts) ? Number(ts) : ts);
+  if (isNaN(d.getTime())) return String(ts);
+  return d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+};
+// 统一日期格式化：时间戳(ms) -> "2026-09-18" 北京时间
+const fmtDate = (ts) => {
+  if (ts == null) return null;
+  const d = typeof ts === 'number' ? new Date(ts) : new Date(typeof ts === 'string' && /^\d+$/.test(ts) ? Number(ts) : ts);
+  if (isNaN(d.getTime())) return String(ts);
+  return d.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+};
 // 包一层：routes 调用 buildHotspots(userId)，内部传 ctx
 function buildHotspots(userId) {
   return buildHotspotsRaw({ db, userConfigs }, userId);
@@ -41,7 +55,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // 数据库初始化
-const db = new sqlite3.Database('./fund_simulator.db', (err) => {
+const db = new sqlite3.Database(require('path').join(__dirname, 'fund_simulator.db'), (err) => {
   if (err) {
     console.error('数据库连接失败:', err.message);
   } else {
@@ -2529,7 +2543,7 @@ app.use(history());
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 // 挂载 AI 核心路由（必须在 SPA fallback 之前）
-app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults, getFundSignal, saveAnalysisResult }));
+app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, fmtDT, aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults, getFundSignal, saveAnalysisResult }));
 
 // 挂载系统/SSE 路由（必须在 SPA fallback 之前）
 app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser, db, userConfigs, computeFundProfiles, getRiskParams, rebalanceCheck, switchFunds, generateReport, performanceAttribution, generatePressureReport, confirmPendingOrders, performAnalysis, saveTransaction, updateHolding, audit }));
@@ -2626,9 +2640,10 @@ app.listen(PORT, () => {
   }, 3000);
 
   // 启动时 AI 为所有用户按性格自动选基（观察池自主维护，无需用户操作）
-  setTimeout(() => {
-    autoDiscoverOnStartup();
-  }, 2000);
+  // 暂时禁用：全流程会阻塞事件循环导致页面打不开
+  // setTimeout(() => {
+  //   autoDiscoverOnStartup();
+  // }, 2000);
 
   // 启动时保存一次当日账户快照（真实数据，供资产走势/每日盈亏图使用）
   setTimeout(async () => {

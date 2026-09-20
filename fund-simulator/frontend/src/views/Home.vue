@@ -17,12 +17,20 @@ const normalizeDateStr = (dateStr: string): string => {
   return dateStr.replace(' ', 'T')
 }
 
-const formatDate = (dateStr: string | null | undefined): string => {
-  if (!dateStr) return '--'
+const formatDate = (dateStr: string | number | null | undefined): string => {
+  if (!dateStr && dateStr !== 0) return '--'
   try {
-    const date = new Date(normalizeDateStr(dateStr))
+    // 时间戳数字（毫秒）直接解析
+    if (typeof dateStr === 'number' || /^\d{10,13}$/.test(String(dateStr))) {
+      const n = Number(dateStr)
+      const date = new Date(n < 1e12 ? n * 1000 : n)
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+      }
+    }
+    const date = new Date(normalizeDateStr(String(dateStr)))
     if (isNaN(date.getTime())) {
-      return dateStr
+      return String(dateStr)
     }
     return date.toLocaleString('zh-CN', {
       year: 'numeric',
@@ -33,7 +41,7 @@ const formatDate = (dateStr: string | null | undefined): string => {
       second: '2-digit'
     })
   } catch {
-    return dateStr
+    return String(dateStr)
   }
 }
 

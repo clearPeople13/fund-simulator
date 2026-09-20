@@ -230,7 +230,8 @@ body {
   border-bottom: 1px solid rgba(129, 140, 248, 0.25);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1000;
+  overflow: visible;
 }
 
 .header-content {

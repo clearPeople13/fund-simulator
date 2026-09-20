@@ -1862,24 +1862,7 @@ function saveAnalysisResult(userId, fundCode, result) {
 }
 
 // /api/ai/analyze 已抽到 routes/ai.js
-// AI 按当前用户性格自主选基进观察池（只读系统：只影响观察池，不涉及任何交易）
-app.post('/api/ai/discover-watchlist', async (req, res) => {
-  try {
-    const userId = (req.body && req.body.user_id) || currentUser;
-    if (!userConfigs[userId]) return res.status(404).json({ error: '用户不存在' });
-    const result = await aiDiscoverWatchlist(userId);
-    const list = await getWatchlist(userId);
-    res.json({
-      message: `AI已按${userConfigs[userId].style}维护观察池：新增 ${result.inserted.length} 只，自动调整 ${result.removed} 只`,
-      inserted: result.inserted,
-      removed: result.removed,
-      watchlist: list
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// /api/ai/discover-watchlist 已抽到 routes/ai.js
 // 启动时为所有用户按性格自动选基（AI 自主维护观察池，幂等只补充）
 async function autoDiscoverOnStartup() {
   try {

@@ -114,7 +114,7 @@ onMounted(() => {
             v-model:selectedKeys="selectedKeys"
             mode="horizontal"
             class="header-menu"
-            :overflowed-indicator="null"
+            :overflowed-indicator="'更多'"
             @click="handleSelect"
           >
             <a-menu-item key="/">

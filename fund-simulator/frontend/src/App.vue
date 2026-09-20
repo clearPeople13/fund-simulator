@@ -240,6 +240,7 @@ body {
   height: 100%;
   max-width: 1400px;
   margin: 0 auto;
+  gap: 16px;
 }
 
 .logo {
@@ -260,8 +261,10 @@ body {
   background: transparent !important;
   border: none !important;
   flex: 1;
-  margin-left: 40px;
+  margin-left: 20px;
   line-height: 62px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .header-menu .ant-menu-item {

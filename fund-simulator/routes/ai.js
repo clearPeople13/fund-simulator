@@ -1,12 +1,12 @@
 /**
  * AI 核心查询路由：/api/ai/portfolio /api/ai/compare /api/ai/transactions /api/ai/hotspots
- * ctx: { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots }
+ * ctx: { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist }
  */
 const { Router } = require('express');
 
 module.exports = function aiRoutes(ctx) {
   const r = Router();
-  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots } = ctx;
+  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist } = ctx;
 
   // 获取AI持仓
   r.get('/portfolio', async (req, res) => {
@@ -158,6 +158,22 @@ module.exports = function aiRoutes(ctx) {
         pending.push({ ...p, fund_name: fund ? fund.fund_name : p.fund_code });
       }
       res.json({ list: enriched, pending });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // AI 按用户性格自主选基进观察池
+  r.post('/discover-watchlist', async (req, res) => {
+    try {
+      const userId = (req.body && req.body.user_id) || getCurrentUser();
+      if (!userConfigs[userId]) return res.status(404).json({ error: '用户不存在' });
+      const result = await aiDiscoverWatchlist(userId);
+      const list = await getWatchlist(userId);
+      res.json({
+        message: `AI已按${userConfigs[userId].style}维护观察池：新增 ${result.inserted.length} 只，自动调整 ${result.removed} 只`,
+        inserted: result.inserted,
+        removed: result.removed,
+        watchlist: list
+      });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 

@@ -2031,37 +2031,7 @@ async function autoDiscoverOnStartup() {
 // /api/ai/portfolio + /api/ai/compare + /api/ai/transactions 已抽到 routes/ai.js
 // 单基金每日收益明细：日期 / 当日涨幅 / 当日持有份额 / 当日盈亏金额（T+1：买入当日无收益）
 // /api/ai/fund-daily-pnl 已抽到 routes/readonly.js
-// 获取AI交易记录
-app.get('/api/ai/transactions', async (req, res) => {
-  try {
-    const userId = req.query.user_id || currentUser;
-    const portfolio = await getUserPortfolio(userId);
-    const txs = portfolio.transactions || [];
-    // 附带真实基金名称（JOIN funds，取代前端硬编码映射）
-    const enriched = [];
-    for (const tx of txs) {
-      const fund = await new Promise((resolve) => {
-        db.get('SELECT fund_name FROM funds WHERE fund_code = ?', [tx.fund_code], (err, row) => resolve(err ? null : row));
-      });
-      enriched.push({ ...tx, fund_name: fund ? fund.fund_name : tx.fund_code });
-    }
-    // 待确认订单（T+1：SUBMITTED，20:00 按 trade_date 官方净值落账）
-    const pendingRows = await new Promise((resolve, reject) => {
-      db.all("SELECT id, fund_code, order_type, amount, shares, price, fee, status, order_date, trade_date, reason FROM orders WHERE user_id = ? AND status = 'SUBMITTED' ORDER BY id DESC", [userId], (err, rows) => err ? reject(err) : resolve(rows || []));
-    });
-    const pending = [];
-    for (const p of pendingRows) {
-      const fund = await new Promise((resolve) => {
-        db.get('SELECT fund_name FROM funds WHERE fund_code = ?', [p.fund_code], (err, row) => resolve(err ? null : row));
-      });
-      pending.push({ ...p, fund_name: fund ? fund.fund_name : p.fund_code });
-    }
-    res.json({ list: enriched, pending });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// /api/ai/transactions 已抽到 routes/ai.js
 // /api/ai/daily 已抽到 routes/readonly.js
 // 用户管理API
 
@@ -2823,7 +2793,7 @@ app.use(express.static(path.join(__dirname, 'frontend/dist')));
 app.use(express.static('public'));
 
 // 挂载 AI 核心路由（必须在 SPA fallback 之前）
-app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots }));
+app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist }));
 
 // 挂载系统/SSE 路由（必须在 SPA fallback 之前）
 app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser }));

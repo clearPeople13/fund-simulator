@@ -2026,11 +2026,7 @@ async function autoDiscoverOnStartup() {
   }
 }
 
-// 获取AI分析状态
-app.get('/api/ai/status', (req, res) => {
-  res.json(aiAnalysisStatus);
-});
-
+// /api/ai/status 已抽到 routes/system.js
 // 获取AI分析结果
 app.get('/api/ai/results', async (req, res) => {
   try {
@@ -2388,29 +2384,8 @@ app.post('/api/scheduler/run', async (req, res) => {
 
 // /api/audit 已抽到 routes/readonly.js
 
-app.get('/api/ai/stream', (req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no'
-  });
-  res.write(': connected\n\n');
-  const send = (evt) => res.write('data: ' + JSON.stringify(evt) + '\n\n');
-  send({ time: new Date().toISOString(), type: 'system', message: 'AI 日志流已连接' });
-  const onLog = (evt) => send(evt);
-  aiBus.on('ai-log', onLog);
-  const heartbeat = setInterval(() => res.write(': hb\n\n'), 25000);
-  req.on('close', () => { clearInterval(heartbeat); aiBus.off('ai-log', onLog); });
-});
-
-app.get('/api/scheduler/status', (req, res) => {
-  res.json({
-    trading_day: isTradingDay(new Date()),
-    tasks: ['realtime(30min)', 'pre_close(14:30)', 'close(15:00)', 'post_close_confirm(20:00)', 'daily_backup(23:30)']
-  });
-});
-
+// /api/ai/stream 已抽到 routes/system.js
+// /api/scheduler/status 已抽到 routes/system.js
 // ===== AI 经营成绩单（用户通过数据看 AI 决策质量）=====
 app.get('/api/ai/stats', async (req, res) => {
   try {
@@ -3433,6 +3408,9 @@ app.use(express.static(path.join(__dirname, 'frontend/dist')));
 
 // 静态文件服务（放在API路由之后）
 app.use(express.static('public'));
+
+// 挂载系统/SSE 路由（必须在 SPA fallback 之前）
+app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay }));
 
 // 挂载只读查询路由（必须在 SPA fallback 之前）
 app.use('/api', require('./routes/readonly')({ db, getCurrentUser, getRiskParams }));

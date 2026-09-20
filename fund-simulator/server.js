@@ -1,4 +1,5 @@
 const express = require('express');
+const { getUserPortfolio: getUserPortfolioRaw, saveTransaction: saveTransactionRaw, updateHolding: updateHoldingRaw, getAnalysisResults: getAnalysisResultsRaw } = require('./services/portfolio');
 const { buildHotspots: buildHotspotsRaw } = require('./services/hotspots');
 // 包一层：routes 调用 buildHotspots(userId)，内部传 ctx
 function buildHotspots(userId) {
@@ -49,6 +50,20 @@ const db = new sqlite3.Database('./fund_simulator.db', (err) => {
     initDatabase();
   }
 });
+
+// 包一层：services 函数注入 ctx
+function getUserPortfolio(userId) {
+  return getUserPortfolioRaw({ db, userConfigs }, userId);
+}
+function saveTransaction(userId, transaction) {
+  return saveTransactionRaw({ db }, userId, transaction);
+}
+function updateHolding(userId, fundCode, shares, costPrice, totalCost) {
+  return updateHoldingRaw({ db }, userId, fundCode, shares, costPrice, totalCost);
+}
+function getAnalysisResults(userId) {
+  return getAnalysisResultsRaw({ db }, userId);
+}
 
 // 初始化数据库表（幂等：不删除已有数据，仅确保表存在）
 function initDatabase() {
@@ -1722,127 +1737,7 @@ let aiAnalysisStatus = {
 let aiAnalysisResults = {};
 
 // 获取用户持仓（从数据库）
-function getUserPortfolio(userId) {
-  return new Promise((resolve, reject) => {
-    const portfolio = {
-      initial_capital: userConfigs[userId]?.initial_capital || 100000,
-      current_capital: userConfigs[userId]?.initial_capital || 100000,
-      holdings: {},
-      transactions: []
-    };
-    
-    // 已实现盈亏（卖出净额-卖出成本，含赎回费影响），先取账本再算现金
-    db.all('SELECT SUM(amount) AS total FROM realized_pnl WHERE user_id = ?', [userId], (errPnl, pnlRows) => {
-      if (errPnl) {
-        reject(errPnl);
-        return;
-      }
-      const realizedTotal = (pnlRows && pnlRows[0] && pnlRows[0].total) || 0;
-      portfolio.realized_pnl = realizedTotal;
-
-      // 获取持仓
-      db.all('SELECT * FROM holdings WHERE user_id = ?', [userId], (err, holdings) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        holdings.forEach(h => {
-          portfolio.holdings[h.fund_code] = {
-            shares: h.shares,
-            cost: h.cost_price,
-            total_cost: h.total_cost
-          };
-          portfolio.current_capital -= h.total_cost;
-        });
-        // 现金 = 初始资金 - 持仓成本 + 已实现盈亏（卖出时已扣赎回费与价差）
-        portfolio.current_capital += realizedTotal;
-
-        // 获取交易记录
-        db.all('SELECT * FROM transactions WHERE user_id = ? ORDER BY transaction_date DESC', [userId], (err, transactions) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-
-          portfolio.transactions = transactions;
-          resolve(portfolio);
-        });
-      });
-    });
-  });
-}
-
-// 保存交易记录到数据库
-function saveTransaction(userId, transaction) {
-  return new Promise((resolve, reject) => {
-    const sql = `INSERT INTO transactions (user_id, fund_code, transaction_type, amount, price, shares, fees, reason, remaining_shares) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'BUY' THEN ? ELSE NULL END)`;
-    
-    db.run(sql, [
-      userId,
-      transaction.fund_code,
-      transaction.action,
-      transaction.amount,
-      transaction.price,
-      transaction.shares,
-      transaction.fees || 0,
-      transaction.reason,
-      transaction.action,
-      transaction.shares
-    ], function(err) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(this.lastID);
-      }
-    });
-  });
-}
-
-// 更新持仓到数据库
-function updateHolding(userId, fundCode, shares, costPrice, totalCost) {
-  return new Promise((resolve, reject) => {
-    const sql = `INSERT OR REPLACE INTO holdings (user_id, fund_code, shares, cost_price, total_cost, updated_at) 
-                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`;
-    
-    db.run(sql, [userId, fundCode, shares, costPrice, totalCost], function(err) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  });
-}
-
-// 获取AI分析结果（从数据库）
-function getAnalysisResults(userId) {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM ai_analysis WHERE user_id = ? ORDER BY analysis_time DESC', [userId], (err, rows) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      
-      const results = {};
-      rows.forEach(row => {
-        results[row.fund_code] = {
-          decision: row.decision,
-          confidence: row.confidence,
-          entry_price: row.entry_price,
-          target_price: row.target_price,
-          stop_loss: row.stop_loss,
-          analysis_time: row.analysis_time
-        };
-      });
-      
-      resolve(results);
-    });
-  });
-}
-
-// 保存AI分析结果到数据库
+// getUserPortfolio + saveTransaction + updateHolding + getAnalysisResults 已抽到 services/portfolio.js
 function saveAnalysisResult(userId, fundCode, result) {
   return new Promise((resolve, reject) => {
     const sql = `INSERT INTO ai_analysis (user_id, fund_code, decision, confidence, entry_price, target_price, stop_loss) 

@@ -309,6 +309,7 @@ body {
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .user-switcher:hover {
@@ -393,22 +394,31 @@ body {
 
 @media (max-width: 768px) {
   .header-content {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 8px;
     padding: 12px 0;
   }
 
   .logo {
-    flex: 1;
+    grid-column: 1;
+    grid-row: 1;
+    margin-right: 0;
   }
 
   .header-right {
-    flex: 0;
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0;
+    margin-top: 0;
   }
 
   .header-menu {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
+    grid-row: 2;
     margin-left: 0;
-    margin-top: 8px;
+    margin-top: 0;
   }
 }
 </style>

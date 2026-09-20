@@ -93,7 +93,7 @@ const filteredFunds = computed(() => funds.value)
 // a-table 列配置（主涨幅列随排行维度动态变化）
 const tableColumns = computed(() => [
   { title: '基金代码', dataIndex: 'fund_code', key: 'fund_code', width: 110 },
-  { title: '基金名称', dataIndex: 'fund_name', key: 'fund_name' },
+  { title: '基金名称', dataIndex: 'fund_name', key: 'fund_name', width: 240 },
   { title: '基金类型', dataIndex: 'fund_type', key: 'fund_type', width: 110 },
   { title: '最新净值', key: 'latest_nav', width: 130 },
   { title: rankLabel.value + (sortKey.value === 'scale' ? '（亿）' : '涨幅'), key: 'rank_value', width: 150, align: 'right' },
@@ -440,8 +440,8 @@ onMounted(() => {
 .rank-track { position: relative; width: 96px; height: 6px; background: rgba(30,41,59,0.6); border-radius: 3px; }
 .rank-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(148,163,184,0.5); }
 .rank-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
-.rank-fill.up { background: linear-gradient(90deg, rgba(52,211,153,0.4), #34d399); }
-.rank-fill.down { background: linear-gradient(90deg, #f87171, rgba(248,113,113,0.4)); }
+.rank-fill.up { background: linear-gradient(90deg, rgba(248,113,113,0.4), #f87171); }
+.rank-fill.down { background: linear-gradient(90deg, #34d399, rgba(52,211,153,0.4)); }
 .muted { color: var(--text-muted); }
 .compare-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 10px 16px; background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); border-radius: 10px; font-size: 13px; color: var(--text); }
 .compare-table-wrap { overflow-x: auto; }
@@ -455,6 +455,10 @@ onMounted(() => {
   font-weight: 500;
   cursor: pointer;
   transition: color 0.2s;
+  white-space: normal;
+  word-break: normal;
+  line-height: 1.4;
+  display: inline-block;
 }
 
 .fund-name:hover {
@@ -462,12 +466,12 @@ onMounted(() => {
 }
 
 .profit {
-  color: #34d399;
+  color: #f87171;
   font-weight: 600;
 }
 
 .loss {
-  color: #f87171;
+  color: #34d399;
   font-weight: 600;
 }
 

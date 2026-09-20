@@ -117,6 +117,15 @@ async function createOrder(ctx, o) {
       if (audit) {
         audit('order-engine', 'CREATE_ORDER', `${userId} ${orderType} ${fundCode}`, { id: order.id, amount: order.amount, price: order.price, fee: order.fee });
       }
+      // 飞书通知：AI 买入/卖出
+      try {
+        const { sendFeishu } = require('../notify');
+        const action = orderType === 'BUY' ? '买入' : '卖出';
+        const detail = orderType === 'BUY' ? '¥' + order.amount.toFixed(2) : order.shares.toFixed(2) + '份';
+        const title = `AI操盘${action}：${order.fund_code}`;
+        const content = `${userId} ${action} ${order.fund_code} ${detail}\n原因：${order.reason || '无'}\n时间：${order.order_date}`;
+        sendFeishu(title, content);
+      } catch (notifyErr) { console.error('[飞书] 通知失败: ' + notifyErr.message); }
       resolve(order);
     });
   });

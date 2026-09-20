@@ -669,6 +669,11 @@ async function checkRiskControls(userId, portfolio, orderType, fundCode, amount,
 
 // 记录风控事件（risk_events）
 function logRiskEvent(userId, eventType, fundCode, detail, action) {
+  // 飞书通知：风控预警
+  try {
+    const { sendFeishu } = require('./notify');
+    sendFeishu('风控预警：' + event_type, userId + ' ' + fund_code + ' ' + detail);
+  } catch (e) { console.error('[飞书] 风控通知失败: ' + e.message); }
   db.run(`INSERT INTO risk_events (user_id, event_type, fund_code, detail, action) VALUES (?, ?, ?, ?, ?)`,
     [userId, eventType, fundCode || '', detail || '', action || ''], (err) => {
       if (err) console.error('风控事件写入失败:', err.message);
@@ -1903,7 +1908,13 @@ async function runNavSyncOnce() {
       }
     }
     // 净值同步完成后生成每日复盘（确保当日净值已公布）
-    try { await generateDailyRecap(); console.log('[净值同步] 每日复盘已生成'); } catch (recapErr) { console.error('[净值同步] 复盘失败: ' + recapErr.message); }
+    try {
+      await generateDailyRecap();
+      console.log('[净值同步] 每日复盘已生成');
+      // 飞书通知：每日复盘完成
+      const { sendFeishu } = require('./notify');
+      sendFeishu('每日复盘完成', new Date().toISOString().slice(0, 10) + ' 每日复盘已生成，见报告中心');
+    } catch (recapErr) { console.error('[净值同步] 复盘失败: ' + recapErr.message); }
   } catch (e) {
     console.error('[净值同步] 任务异常: ' + e.message);
   }

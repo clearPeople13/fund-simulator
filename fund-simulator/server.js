@@ -2266,30 +2266,7 @@ app.post('/api/scheduler/run', async (req, res) => {
 // /api/ai/daily-pnl 已抽到 routes/readonly.js
 // 账户累计收益率 vs 沪深300 基准（AI 操盘相对指数表现）
 // /api/ai/performance-vs-benchmark 已抽到 routes/readonly.js
-// ===== 单基金费率（申购/赎回阶梯/管理/托管，真实 fund_fees）=====
-app.get('/api/ai/fund-fees', async (req, res) => {
-  try {
-    const fundCode = req.query.fund_code;
-    if (!fundCode) return res.status(400).json({ error: 'fund_code required' });
-    const fee = await new Promise((resolve) => db.get('SELECT * FROM fund_fees WHERE fund_code = ?', [fundCode], (e, r) => resolve(r || null)));
-    if (!fee) return res.json({ fund_code: fundCode, found: false });
-    let schedule = [];
-    try { schedule = JSON.parse(fee.sell_schedule || '[]'); } catch (e) { schedule = []; }
-    const pct = v => v == null ? null : (v * 100);
-    res.json({
-      fund_code: fundCode, found: true,
-      buy_fee_pct: pct(fee.buy_fee_pct),
-      manage_fee_pct: pct(fee.manage_fee_pct),
-      custody_fee_pct: pct(fee.custody_fee_pct),
-      service_fee_pct: pct(fee.service_fee_pct),
-      sell_schedule: schedule.map(x => ({ days: x.days, rate_pct: Math.round(x.rate * 10000) / 100 })),
-      updated_at: fee.updated_at
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// /api/ai/fund-fees 已抽到 routes/readonly.js
 // ===== AI 市场热点关注与分析（主题词聚类全市场 → 热点板块 + AI 点评 + 观察池关联）=====
 const HOTSPOT_THEMES = [
   { key: '医药/医疗', kws: ['医药', '医疗', '生物', '健康', '创新药', '疫苗'] },

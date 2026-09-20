@@ -10,52 +10,43 @@
 
 ## 二、后端（Node.js + Express + SQLite）
 
-### 2.1 目录结构（模块颗粒化）
+### 2.1 目录结构（实际）
 
 ```
-server.js              # 仅做装配：require 各模块 + listen，不写业务逻辑
-config/
-  db.js                # SQLite 单例连接（唯一出处）
-  constants.js         # HOLIDAYS、交易时段、费率默认值等常量
-events/
-  aiBus.js             # EventEmitter 单例（AI 事件总线）
-middleware/
-  errorHandler.js      # 统一错误处理（4 参数 Express 中间件）
-  asyncHandler.js      # async 路由包装器（try/catch 收拢）
-  tradingGuard.js      # 交易时段/交易日守卫（isMarketOpenNow/isTradingDay）
-services/              # 业务逻辑层（无 HTTP 细节，纯数据操作）
-  portfolio.service.js
-  analysis.service.js  # performAnalysis 主流程
-  report.service.js    # generateReport 各类型
-  watchlist.service.js # aiDiscoverWatchlist
-  fee.service.js
-  market.service.js
-engine/                # 决策引擎（纯函数/策略）
-  signal.js            # getFundSignal
-  risk.js              # checkRiskControls / logRiskEvent
-  order.js             # orderEngine 封装
-  strategy/            # 设计模式：策略——按用户性格分叉
-    base.strategy.js
-    stable.strategy.js
-    aggressive.strategy.js
-routes/                # 路由层（仅参数解析+调 service）
-  ai.routes.js
-  funds.routes.js
-  reports.routes.js
-  scheduler.routes.js
-  market.routes.js
+backend/
+├── server.js          # 入口：装配 + listen（业务逻辑已抽离）
+├── data-fetcher.js    # 基金数据抓取
+├── package.json
+├── fund_simulator.db  # SQLite 数据库
+├── api/               # 旧 API 路由
+├── routes/            # Express 路由层（按职责分文件）
+│   ├── users.js       # 用户路由 8 个
+│   ├── readonly.js    # 只读查询 19 个
+│   ├── system.js      # 系统/SSE/调度 5 个
+│   └── ai.js          # AI 核心 6 个
+├── services/         # 业务逻辑层（无 HTTP 细节）
+│   ├── hotspots.js    # 热点分析引擎
+│   └── portfolio.js   # 组合服务（getUserPortfolio/saveTransaction/updateHolding/getAnalysisResults）
+├── engine/            # 决策引擎（order-engine/fee/holidays）
+├── events/
+│   └── aiBus.js       # EventEmitter 单例（AI 事件总线）
+├── middleware/
+│   └── errorHandler.js # 统一错误处理
+├── utils/
+│   └── time.js        # 时间/交易日纯函数
+├── scripts/           # 一次性脚本
+└── data/              # 数据文件
 ```
 
 ### 2.2 设计模式使用
 
 | 场景 | 模式 | 实现 |
 |---|---|---|
-| DB 连接 | 单例 | `config/db.js` 导出唯一 db 实例 |
-| AI 事件流 | 观察者 | `events/aiBus.js`（已有） |
-| 报告生成 | 工厂 | `report.service.js` 按 type 分发 daily/weekly/monthly/pressure |
-| 用户性格决策 | 策略 | `engine/strategy/*.js`——stable/aggressive 实现同一接口（止损线/建仓比例/入场阈值） |
-| 异步路由错误 | 装饰器 | `asyncHandler(fn)` 收拢 try/catch |
-| 日志 | 门面 | `logAi()` 统一入口：console + SSE + ai_event_logs |
+| DB 连接 | 单例 | `server.js` 里 `new sqlite3.Database` |
+| AI 事件流 | 观察者 | `events/aiBus.js` |
+| 路由分组 | 工厂 | `routes/*.js` 导出 `(ctx) => Router` |
+| 异步路由错误 | 中间件 | `middleware/errorHandler.js` |
+| 日志 | 门面 | `logAi()` 统一入口 |
 
 ### 2.3 统一出口（收拢原则）
 
@@ -74,29 +65,33 @@ routes/                # 路由层（仅参数解析+调 service）
 
 ## 三、前端（Vue3 + Ant Design Vue + ECharts）
 
-### 3.1 目录结构
+### 3.1 目录结构（实际）
 
 ```
-src/
-  api/                 # 统一 API 出口（所有 axios 调用只在这里）
-    client.js           # axios 实例 + 拦截器（统一错误提示）
-    ai.api.js
-    funds.api.js
-    reports.api.js
-    market.api.js
-  components/           # 可复用组件（无业务耦合）
-    StatCard.vue        # 数字卡（标题+数值+涨跌色）
-    FundTable.vue       # 基金表格（排行/对比共用）
-    ChartCard.vue       # ECharts 容器（自动 resize）
-    EmptyState.vue      # 空状态
-    TagPill.vue         # 徽章
-  composables/          # 组合式函数
-    useSSE.js           # EventSource 封装
-    useUser.js          # 当前用户切换
-  stores/               # 轻量状态（Pinia 或 reactive 单例）
-    user.store.js
-  views/                # 页面（薄，只组合组件）
-  router/
+frontend/src/
+├── api/
+│   └── client.js       # axios 实例 + fmtMoney/fmtPct/fmtTime
+├── components/        # 可复用组件
+│   ├── StatCard.vue    # 数字卡
+│   └── EmptyState.vue  # 空状态
+├── composables/
+│   └── useSSE.ts       # SSE 封装
+├── router/
+│   └── index.ts
+├── types/              # TypeScript 类型定义
+├── views/              # 页面
+│   ├── Home.vue
+│   ├── Funds.vue
+│   ├── FundDetail.vue
+│   ├── Portfolio.vue
+│   ├── Analysis.vue
+│   ├── Market.vue
+│   ├── Alerts.vue
+│   ├── Reports.vue
+│   └── Profile.vue
+├── App.vue
+├── main.ts
+└── style.css           # 红涨绿跌全局变量
 ```
 
 ### 3.2 组件复用规则

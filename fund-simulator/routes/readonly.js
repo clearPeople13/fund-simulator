@@ -27,6 +27,107 @@ module.exports = function readonlyRoutes(ctx) {
     });
   });
 
+  r.get('/ai/fund-daily-pnl', async (req, res) => {
+    try {
+      const userId = req.query.user_id || getCurrentUser();
+      const fundCode = req.query.fund_code;
+      if (!fundCode) return res.status(400).json({ error: 'fund_code required' });
+      const txs = await new Promise((resolve, reject) => {
+        db.all("SELECT transaction_type, shares, transaction_date FROM transactions WHERE user_id = ? AND fund_code = ? ORDER BY transaction_date ASC", [userId, fundCode], (e, r) => e ? reject(e) : resolve(r || []));
+      });
+      const navs = await new Promise((resolve, reject) => {
+        db.all("SELECT nav_date, unit_nav, daily_return FROM fund_nav WHERE fund_code = ? ORDER BY nav_date ASC", [fundCode], (e, r) => e ? reject(e) : resolve(r || []));
+      });
+      const dayShares = {}; let shares = 0; let firstDay = null;
+      for (const tx of txs) {
+        const day = String(tx.transaction_date).slice(0, 10);
+        if (tx.transaction_type === 'BUY') shares += tx.shares; else shares -= tx.shares;
+        dayShares[day] = shares;
+        if (firstDay === null || day < firstDay) firstDay = day;
+      }
+      const buyDays = new Set(txs.filter(t => t.transaction_type === 'BUY').map(t => String(t.transaction_date).slice(0, 10)));
+      const rows = []; let lastShares = 0;
+      for (let i = 0; i < navs.length; i++) {
+        const n = navs[i];
+        if (n.nav_date < firstDay) continue;
+        if (dayShares[n.nav_date] !== undefined) lastShares = dayShares[n.nav_date];
+        const sh = lastShares; let pnl = 0;
+        if (i > 0 && sh > 0) pnl = sh * (n.unit_nav - navs[i - 1].unit_nav);
+        if (buyDays.has(n.nav_date)) pnl = 0;
+        rows.push({ date: n.nav_date, nav: n.unit_nav, daily_return: n.daily_return, shares: Math.round(sh * 1000) / 1000, pnl: Math.round(pnl * 100) / 100 });
+      }
+      res.json({ user_id: userId, fund_code: fundCode, data: rows });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  r.get('/ai/daily-pnl', async (req, res) => {
+    try {
+      const userId = req.query.user_id || getCurrentUser();
+      const all = (sql, params = []) => new Promise((resolve, reject) => db.all(sql, params, (e, r) => e ? reject(e) : resolve(r || [])));
+      const codes = await all('SELECT DISTINCT fund_code FROM transactions WHERE user_id = ?', [userId]);
+      const dayMap = {}; const nameMap = {};
+      for (const row of codes) {
+        const fundCode = row.fund_code;
+        const fund = await new Promise((resolve) => db.get('SELECT fund_name FROM funds WHERE fund_code = ?', [fundCode], (e, r) => resolve(r || null)));
+        nameMap[fundCode] = fund ? fund.fund_name : fundCode;
+        const txs = await all('SELECT transaction_type, shares, transaction_date FROM transactions WHERE user_id = ? AND fund_code = ? ORDER BY transaction_date ASC', [userId, fundCode]);
+        const navs = await all('SELECT nav_date, unit_nav FROM fund_nav WHERE fund_code = ? ORDER BY nav_date ASC', [fundCode]);
+        const dayShares = {}; let shares = 0; let firstDay = null;
+        for (const tx of txs) {
+          const day = String(tx.transaction_date).slice(0, 10);
+          if (tx.transaction_type === 'BUY') shares += tx.shares; else shares -= tx.shares;
+          dayShares[day] = shares;
+          if (firstDay === null || day < firstDay) firstDay = day;
+        }
+        const buyDays = new Set(txs.filter(t => t.transaction_type === 'BUY').map(t => String(t.transaction_date).slice(0, 10)));
+        let lastShares = 0;
+        for (let i = 0; i < navs.length; i++) {
+          const n = navs[i];
+          if (n.nav_date < firstDay) continue;
+          if (dayShares[n.nav_date] !== undefined) lastShares = dayShares[n.nav_date];
+          let pnl = 0;
+          if (i > 0 && lastShares > 0) pnl = lastShares * (n.unit_nav - navs[i - 1].unit_nav);
+          if (buyDays.has(n.nav_date)) pnl = 0;
+          pnl = Math.round(pnl * 100) / 100;
+          if (pnl === 0 && lastShares === 0) continue;
+          dayMap[n.nav_date] = dayMap[n.nav_date] || { total: 0, funds: {} };
+          dayMap[n.nav_date].funds[fundCode] = pnl;
+          dayMap[n.nav_date].total += pnl;
+        }
+      }
+      const snaps = await all('SELECT date, daily_pnl FROM portfolio_daily WHERE user_id = ? ORDER BY date ASC', [userId]);
+      const snapMap = {};
+      (snaps || []).forEach(x => { snapMap[x.date] = x.daily_pnl; });
+      const rows = Object.keys(dayMap).sort().map(date => ({
+        date, pnl: Math.round(dayMap[date].total * 100) / 100,
+        account_pnl: snapMap[date] != null ? snapMap[date] : null,
+        funds: dayMap[date].funds
+      }));
+      res.json({ list: rows, fund_names: nameMap });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  r.get('/ai/performance-vs-benchmark', async (req, res) => {
+    const qall = (sql, params = []) => new Promise((resolve, reject) => db.all(sql, params, (e, r) => e ? reject(e) : resolve(r || [])));
+    try {
+      const userId = req.query.user_id || getCurrentUser();
+      const snaps = await qall('SELECT date, total_assets FROM portfolio_daily WHERE user_id = ? ORDER BY date ASC', [userId]);
+      const cfg = await new Promise((resolve) => db.get('SELECT initial_capital FROM user_configs WHERE user_id = ?', [userId], (e, r) => resolve(r || null)));
+      const initial = (cfg && cfg.initial_capital) || 100000;
+      const bench = await qall('SELECT date, value FROM benchmark_daily ORDER BY date ASC');
+      const accMap = {}, benchMap = {};
+      snaps.forEach(s => { accMap[s.date] = Math.round((s.total_assets / initial - 1) * 10000) / 100; });
+      if (bench.length) {
+        const base = bench[0].value || 1;
+        bench.forEach(b => { benchMap[b.date] = Math.round((b.value / base - 1) * 10000) / 100; });
+      }
+      const dates = [...new Set([...Object.keys(accMap), ...Object.keys(benchMap)])].sort();
+      res.json({ initial_capital: initial, series: dates.map(d => ({
+        date: d, account_pct: accMap[d] != null ? accMap[d] : null, bench_pct: benchMap[d] != null ? benchMap[d] : null
+      })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   r.get('/analysis/logs', async (req, res) => {
     try {
       const userId = req.query.user_id || getCurrentUser();

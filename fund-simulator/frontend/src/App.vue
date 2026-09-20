@@ -107,8 +107,19 @@ onMounted(() => {
       <header class="app-header">
         <div class="header-content">
           <div class="logo">
-            <LineChartOutlined class="logo-icon" />
-            <span>AI自动操盘系统</span>
+            <div class="logo-mark">
+              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 20 L10 14 L16 18 L22 8 L28 12" stroke="url(#logoGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="22" cy="8" r="3" fill="#22d3ee"/>
+                <defs>
+                  <linearGradient id="logoGrad" x1="4" y1="20" x2="28" y2="8">
+                    <stop offset="0%" stop-color="#6366f1"/>
+                    <stop offset="100%" stop-color="#22d3ee"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span class="logo-text">AI自动操盘</span>
           </div>
           <a-menu
             v-model:selectedKeys="selectedKeys"
@@ -247,12 +258,36 @@ body {
 .logo {
   display: flex;
   align-items: center;
-  font-size: 18px;
-  font-weight: 600;
   gap: 10px;
   white-space: nowrap;
   flex-shrink: 0;
   margin-right: auto;
+}
+
+.logo-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(34,211,238,0.15));
+  border: 1px solid rgba(99,102,241,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-mark svg {
+  width: 22px;
+  height: 22px;
+}
+
+.logo-text {
+  font-size: 17px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e0e7ff, #a5f3fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.5px;
 }
 
 .logo .logo-icon {

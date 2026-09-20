@@ -226,13 +226,30 @@ module.exports = function aiRoutes(ctx) {
         }
         const action = sig.signal.action;
         const entry = sig.latest_nav;
+        // AI 大模型分析（MIMO Pro 2.5）
+        let aiDecision = (action === 'buy' || action === 'add') ? 'BUY' : 'HOLD';
+        let aiConfidence = action === 'buy' ? '高' : (action === 'add' ? '中' : '低');
+        let aiReason = sig.signal.reason;
+        try {
+          const { analyzeFund } = require('../ai-advisor');
+          const user = userConfigs[userId] || {};
+          const aiResult = await analyzeFund({
+            fund_name: code, fund_code: code,
+            latest_nav: entry, daily_return: sig.daily_return,
+            change_5d: sig.change_5d, change_20d: sig.change_20d,
+            drawdown_60d: sig.drawdown_60d, above_ma20: sig.above_ma20
+          }, user.style || '稳健型');
+          aiDecision = aiResult.decision;
+          aiConfidence = aiResult.confidence;
+          aiReason = aiResult.reason;
+        } catch (aiErr) { console.error('[AI] 分析失败: ' + aiErr.message); }
         analysisResults[code] = {
-          decision: (action === 'buy' || action === 'add') ? 'BUY' : 'HOLD',
-          confidence: action === 'buy' ? '高' : (action === 'add' ? '中' : '低'),
+          decision: aiDecision,
+          confidence: aiConfidence,
           entry_price: entry, target_price: Number((entry * 1.1).toFixed(4)),
           stop_loss: Number((entry * 0.95).toFixed(4)),
           analysis_time: new Date().toISOString(),
-          signal_label: sig.signal.label, signal_reason: sig.signal.reason,
+          signal_label: 'AI分析', signal_reason: aiReason,
           change_5d: sig.change_5d, change_20d: sig.change_20d,
           drawdown_60d: sig.drawdown_60d, above_ma20: sig.above_ma20,
           nav_date: sig.nav_date, daily_return: sig.daily_return

@@ -256,10 +256,16 @@ module.exports = function aiRoutes(ctx) {
         suggestions.push({ fund_code: code, signal: action, amount: suggestAmount, reason: sig.signal.reason });
       }
       const suggestCodes = suggestions.map(s => s.fund_code);
+      const msg = suggestions.length > 0
+        ? `分析完成：观察池 ${fund_codes.length} 只中 ${suggestions.length} 只出现入场信号（${suggestCodes.join('、')}），仅供查看参考，系统不执行交易`
+        : `分析完成：观察池 ${fund_codes.length} 只均无入场信号，建议继续观望`;
+      // 飞书通知：AI 分析完成
+      try {
+        const { sendFeishu } = require('../notify');
+        sendFeishu('AI分析完成', userId + ' ' + msg);
+      } catch (e) { console.error('[飞书] 分析通知失败: ' + e.message); }
       res.json({
-        message: suggestions.length > 0
-          ? `分析完成：观察池 ${fund_codes.length} 只中 ${suggestions.length} 只出现入场信号（${suggestCodes.join('、')}），仅供查看参考，系统不执行交易`
-          : `分析完成：观察池 ${fund_codes.length} 只均无入场信号，建议继续观望`,
+        message: msg,
         results: analysisResults, suggestions,
         portfolio: { current_capital: portfolio.current_capital, holdings: portfolio.holdings },
         analysis_time: aiAnalysisStatus.lastAnalysis

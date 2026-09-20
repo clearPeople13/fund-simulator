@@ -1889,56 +1889,7 @@ async function autoDiscoverOnStartup() {
 // 用户管理API
 
 // 获取所有用户列表
-// ============ P0-1 新增 API：订单/审计/调度状态 ============
-app.post('/api/scheduler/run', async (req, res) => {
-  // 仅本机调试/测试用：手动触发周期任务（设计文档 §7）
-  const type = (req.query.type || req.body.type || 'close').toLowerCase();
-  const allowed = ['close', 'realtime', 'pre_close', 'confirm', 'weekly', 'monthly'];
-  if (!allowed.includes(type)) {
-    return res.status(400).json({ error: 'type 仅支持: ' + allowed.join(',') });
-  }
-  try {
-    if (type === 'weekly') {
-      // 手动触发周任务：评分更新 + 再平衡 + 换仓 + 周报（交易步骤受交易时段守卫；盘外触发跳过交易仅生成报告）
-      await computeFundProfiles();
-      const results = [];
-      for (const userId of Object.keys(userConfigs)) {
-        const cfg = await getRiskParams(userId);
-        let rb = null, sw = null;
-        try { rb = await rebalanceCheck(userId); } catch (e) { rb = 'SKIP:' + e.message; }
-        try { sw = await switchFunds(userId); } catch (e) { sw = 'SKIP:' + e.message; }
-        await generateReport(userId, 'weekly');
-        results.push({ userId, rebalance: rb, switch: sw });
-      }
-      return res.json({ ok: true, type, results });
-    }
-    if (type === 'monthly') {
-      // 手动触发月任务：归因 + 压力测试 + 月报 + 分红同步
-      const results = [];
-      for (const userId of Object.keys(userConfigs)) {
-        const attr = await performanceAttribution(userId);
-        await generatePressureReport(userId);
-        await generateReport(userId, 'monthly');
-        results.push({ userId, attribution: attr });
-      }
-      return res.json({ ok: true, type, results });
-    }
-    if (type === 'confirm') {
-      const r = await confirmPendingOrders({ db, saveTransaction, updateHolding, audit });
-      res.json({ ok: true, type, confirmed: r.confirmed, errors: r.errors });
-    } else {
-      const started = new Date().toISOString();
-      await performAnalysis(type);
-      const finished = new Date().toISOString();
-      db.run(`INSERT INTO scheduler_runs (run_type, started_at, finished_at, status, summary) VALUES (?, ?, ?, 'done', ?)`,
-        [type, started, finished, 'manual trigger'], (err) => { if (err) console.error('scheduler_runs 写入失败:', err.message); });
-      res.json({ ok: true, type, started, finished });
-    }
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
-
+// /api/scheduler/run 已抽到 routes/system.js
 // /api/audit 已抽到 routes/readonly.js
 
 // /api/ai/stream 已抽到 routes/system.js
@@ -2649,7 +2600,7 @@ app.use(express.static('public'));
 app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults, getFundSignal, saveAnalysisResult }));
 
 // 挂载系统/SSE 路由（必须在 SPA fallback 之前）
-app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser }));
+app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser, db, userConfigs, computeFundProfiles, getRiskParams, rebalanceCheck, switchFunds, generateReport, performanceAttribution, generatePressureReport, confirmPendingOrders, performAnalysis, saveTransaction, updateHolding, audit }));
 
 // 挂载只读查询路由（必须在 SPA fallback 之前）
 app.use('/api', require('./routes/readonly')({ db, getCurrentUser, getRiskParams }));

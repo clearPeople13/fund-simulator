@@ -2207,17 +2207,7 @@ async function buildHotspots(userId) {
 
 // 市场行情概览：基准指数走势 + 市场温度 + 全市场基金涨跌统计
 // /api/market/overview 已抽到 routes/readonly.js
-app.get('/api/ai/hotspots', async (req, res) => {
-  try {
-    const userId = req.query.user_id || currentUser;
-    if (!userConfigs[userId]) return res.status(404).json({ error: '用户不存在' });
-    const data = await buildHotspots(userId);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// /api/ai/hotspots 已抽到 routes/ai.js
 // 用户管理API
 // /api/users/* 路由已抽到 routes/users.js
 // /api/analysis/logs + /api/analysis/latest 已抽到 routes/readonly.js
@@ -2833,7 +2823,7 @@ app.use(express.static(path.join(__dirname, 'frontend/dist')));
 app.use(express.static('public'));
 
 // 挂载 AI 核心路由（必须在 SPA fallback 之前）
-app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs }));
+app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots }));
 
 // 挂载系统/SSE 路由（必须在 SPA fallback 之前）
 app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser }));

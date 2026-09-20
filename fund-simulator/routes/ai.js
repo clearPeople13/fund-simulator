@@ -1,12 +1,12 @@
 /**
- * AI 核心查询路由：/api/ai/portfolio /api/ai/compare /api/ai/transactions
- * ctx: { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs }
+ * AI 核心查询路由：/api/ai/portfolio /api/ai/compare /api/ai/transactions /api/ai/hotspots
+ * ctx: { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots }
  */
 const { Router } = require('express');
 
 module.exports = function aiRoutes(ctx) {
   const r = Router();
-  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs } = ctx;
+  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots } = ctx;
 
   // 获取AI持仓
   r.get('/portfolio', async (req, res) => {
@@ -158,6 +158,16 @@ module.exports = function aiRoutes(ctx) {
         pending.push({ ...p, fund_name: fund ? fund.fund_name : p.fund_code });
       }
       res.json({ list: enriched, pending });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // 市场热点分析
+  r.get('/hotspots', async (req, res) => {
+    try {
+      const userId = req.query.user_id || getCurrentUser();
+      if (!userConfigs[userId]) return res.status(404).json({ error: '用户不存在' });
+      const data = await buildHotspots(userId);
+      res.json(data);
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 

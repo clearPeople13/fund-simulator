@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useSSE } from '../composables/useSSE'
 import { message } from 'ant-design-vue'
 import axios from 'axios'
 import * as echarts from 'echarts'
@@ -87,8 +88,7 @@ const aiStats = ref<any>(null) // AI 经营成绩单
 const aiActivity = ref<any[]>([]) // AI 决策轨迹
 const hotspots = ref<any>(null) // AI 市场热点分析
 const aiCompare = ref<any>(null) // 双经理经营对比
-const liveLogs = ref<any[]>([]) // AI 实时日志流
-const liveStatus = ref<'connecting'|'live'|'closed'>('connecting')
+const { logs: liveLogs, status: liveStatus, connect: connectSSE } = useSSE('/api/ai/stream') // AI 实时日志流（SSE 复用 composable）
 const watchList = ref<any[]>([])
 const dailyHistory = ref<any[]>([])
 
@@ -897,25 +897,9 @@ const initDetailChart = () => {
   window.addEventListener('resize', () => myChart.resize())
 }
 
-// AI 实时日志流（SSE）
-const startLiveStream = () => {
-  try {
-    const es = new EventSource('/api/ai/stream')
-    es.onopen = () => { liveStatus.value = 'live' }
-    es.onerror = () => { liveStatus.value = 'closed' }
-    es.onmessage = (ev: MessageEvent) => {
-      try {
-        const data = JSON.parse(ev.data)
-        liveLogs.value.unshift(data)
-        if (liveLogs.value.length > 60) liveLogs.value.length = 60
-      } catch (e) { /* ignore */ }
-    }
-  } catch (e) { liveStatus.value = 'closed' }
-}
-
 onMounted(() => {
   loadAllData()
-  startLiveStream()
+  connectSSE()
 })
 </script>
 

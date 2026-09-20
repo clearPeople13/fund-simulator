@@ -28,6 +28,7 @@
    - **加了新功能**（如：费用统计/压力测试）→ 同步更新 README.md 功能列表 + SYSTEM_KNOWLEDGE.md
    - **修了 bug**（如：000001 基金名称错误）→ 同步更新 SYSTEM_KNOWLEDGE.md "缺陷修复史"
    - **改了 UI/交互**（如：header 布局/卡片间距）→ 同步更新 README.md "界面说明"
+   - **改了启动路径/目录结构**（如：server.js 从根目录移到 backend/）→ 同步更新部署配置 + 根目录入口文件（如：fund-simulator/server.js 指向 backend/server.js）
    - **改了目录结构**（如：前后端分离）→ 同步更新 README.md "目录结构"
    - **每次 commit 前**：检查文档是否需要同步更新，需要就一起 commit
    - **例外**：用户手动改的文档（如用户自己写的需求）不需要自动更新

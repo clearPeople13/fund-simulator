@@ -557,19 +557,19 @@ const triggerManualAnalysis = async () => {
   analysisMessage.value = '正在准备分析...'
   
   try {
+    // 进度条只模拟到 90%，API 返回后再到 100%
     const steps = [
       { progress: 10, message: '获取基金数据...' },
       { progress: 30, message: '技术面分析...' },
       { progress: 50, message: '基本面分析...' },
-      { progress: 70, message: '情绪面分析...' },
-      { progress: 90, message: '生成交易决策...' },
-      { progress: 100, message: '分析完成！' }
+      { progress: 70, message: 'AI 深度分析中...' },
+      { progress: 90, message: '生成交易决策...' }
     ]
     
     for (const step of steps) {
       analysisProgress.value = step.progress
       analysisMessage.value = step.message
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 400))
     }
     
     // 只分析观察池中的标的（观察池 = AI 选股池，无观察则不入场）
@@ -580,15 +580,16 @@ const triggerManualAnalysis = async () => {
       user_id: currentUser.value?.id || 'default'
     })
     
+    // API 返回后，进度条到 100%
+    analysisProgress.value = 100
     analysisMessage.value = analyzeRes.data?.message || '分析完成！'
     await loadAllData()
     
     // 立即重置状态（不要等 2 秒）
     isAnalyzing.value = false
-    analysisProgress.value = 0
-    analysisMessage.value = analyzeRes.data?.message || ''
-    // 2 秒后清空消息
+    // 3 秒后清空进度条和消息
     setTimeout(() => {
+      analysisProgress.value = 0
       analysisMessage.value = ''
     }, 3000)
     

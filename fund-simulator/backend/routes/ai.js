@@ -384,13 +384,20 @@ module.exports = function aiRoutes(ctx) {
         suggestions.push({ fund_code: code, signal: action, amount: suggestAmount, reason: sig.signal.reason });
       }
       const suggestCodes = suggestions.map(s => s.fund_code);
+      // 排版优化：基金代码每行 6 个分组显示
+      const groupSize = 6;
+      const groups = [];
+      for (let i = 0; i < suggestCodes.length; i += groupSize) {
+        groups.push(suggestCodes.slice(i, i + groupSize).join('  '));
+      }
+      const styleName = (userConfigs[userId] && userConfigs[userId].style) || '未知';
       const msg = suggestions.length > 0
-        ? `分析完成：观察池 ${fund_codes.length} 只中 ${suggestions.length} 只出现入场信号（${suggestCodes.join('、')}），仅供查看参考，系统不执行交易`
-        : `分析完成：观察池 ${fund_codes.length} 只均无入场信号，建议继续观望`;
+        ? `【${styleName}】观察池 ${fund_codes.length} 只 | 入场信号 ${suggestions.length} 只\n━━━━━━━━━━━━━━\n📈 入场信号基金：\n${groups.join('\n')}\n━━━━━━━━━━━━━━\n仅供参考，系统不自动交易`
+        : `【${styleName}】观察池 ${fund_codes.length} 只 | 无入场信号，建议观望`;
       // 飞书通知：AI 分析完成
       try {
         const { sendFeishu } = require('../notify');
-        await sendFeishu('AI分析完成', userId + ' ' + msg);
+        await sendFeishu('AI分析完成', msg);
       } catch (e) { console.error('[飞书] 分析通知失败: ' + e.message); }
       res.json({
         message: msg,

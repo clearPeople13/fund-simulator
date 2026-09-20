@@ -8,7 +8,7 @@ const { Router } = require('express');
 
 module.exports = function aiRoutes(ctx) {
   const r = Router();
-  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, fmtDT,
+  const { db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, fmtDT, isTradingTime,
           aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults,
           getFundSignal, saveAnalysisResult } = ctx;
   // full-process 路由用的局部变量
@@ -346,8 +346,11 @@ module.exports = function aiRoutes(ctx) {
         };
         await saveAnalysisResult(userId, code, analysisResults[code]);
         
-        // AI 自动交易：BUY → 自动买入
+        // AI 自动交易：BUY → 自动买入（仅在交易时间执行）
         if (aiDecision === 'BUY') {
+          if (!isTradingTime()) {
+            console.log(`[AI交易] ${userId} ${code} AI 建议买入，但当前非交易时间，跳过交易（仅记录分析）`);
+          } else {
           console.log(`[AI交易] ${userId} ${code} AI 建议买入，自动执行...`);
           try {
             // 买入金额：总资产的 5%
@@ -367,6 +370,7 @@ module.exports = function aiRoutes(ctx) {
           } catch (tradeErr) {
             console.error(`[AI交易] ${code} 买入失败: ${tradeErr.message}`);
           }
+          } // end isTradingTime else
         }
       }
       aiAnalysisStatus.status = 'completed';

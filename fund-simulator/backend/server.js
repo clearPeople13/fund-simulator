@@ -15,6 +15,18 @@ const fmtDate = (ts) => {
   if (isNaN(d.getTime())) return String(ts);
   return d.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
 };
+// 判断当前是否在基金交易时间（北京时间周一至周五 9:30-15:00）
+const isTradingTime = () => {
+  const now = new Date();
+  // 转北京时间
+  const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+  const day = bj.getDay(); // 0=周日, 6=周六
+  if (day === 0 || day === 6) return false; // 周末
+  const h = bj.getHours();
+  const m = bj.getMinutes();
+  const minutes = h * 60 + m;
+  return minutes >= 9 * 60 + 30 && minutes <= 15 * 60; // 9:30-15:00
+};
 // 包一层：routes 调用 buildHotspots(userId)，内部传 ctx
 function buildHotspots(userId) {
   return buildHotspotsRaw({ db, userConfigs }, userId);
@@ -2543,7 +2555,7 @@ app.use(history());
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 // 挂载 AI 核心路由（必须在 SPA fallback 之前）
-app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, fmtDT, aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults, getFundSignal, saveAnalysisResult }));
+app.use('/api/ai', require('./routes/ai')({ db, getUserPortfolio, getCurrentUser, getLocalDateStr, userConfigs, buildHotspots, fmtDT, isTradingTime, aiDiscoverWatchlist, getWatchlist, getUserWatchlistCodes, aiAnalysisStatus, aiAnalysisResults, getFundSignal, saveAnalysisResult }));
 
 // 挂载系统/SSE 路由（必须在 SPA fallback 之前）
 app.use('/api', require('./routes/system')({ aiAnalysisStatus, aiBus, isTradingDay, getAnalysisResults, getCurrentUser, db, userConfigs, computeFundProfiles, getRiskParams, rebalanceCheck, switchFunds, generateReport, performanceAttribution, generatePressureReport, confirmPendingOrders, performAnalysis, saveTransaction, updateHolding, audit }));

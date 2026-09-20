@@ -27,6 +27,16 @@ module.exports = function readonlyRoutes(ctx) {
     });
   });
 
+  r.get('/ai/daily', async (req, res) => {
+    try {
+      const userId = req.query.user_id || getCurrentUser();
+      const rows = await new Promise((resolve, reject) => {
+        db.all('SELECT date, total_assets, daily_pnl, cash, market_value FROM portfolio_daily WHERE user_id = ? ORDER BY date ASC', [userId], (e, rows) => e ? reject(e) : resolve(rows || []));
+      });
+      res.json(rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   r.get('/daily-recap', (req, res) => {
     const userId = req.query.user_id || getCurrentUser();
     db.all('SELECT * FROM reports WHERE user_id = ? AND report_type = ? ORDER BY id DESC LIMIT 7', [userId, 'daily'], (e, rows) => {

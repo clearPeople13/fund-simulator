@@ -2314,21 +2314,7 @@ app.get('/api/ai/transactions', async (req, res) => {
   }
 });
 
-// 获取每日账户快照（资产走势/每日盈亏图真实数据）
-app.get('/api/ai/daily', async (req, res) => {
-  try {
-    const userId = req.query.user_id || currentUser;
-    const rows = await new Promise((resolve, reject) => {
-      db.all('SELECT date, total_assets, daily_pnl, cash, market_value FROM portfolio_daily WHERE user_id = ? ORDER BY date ASC', [userId], (err, rows) => {
-        if (err) reject(err); else resolve(rows || []);
-      });
-    });
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// /api/ai/daily 已抽到 routes/readonly.js
 // 用户管理API
 
 // 获取所有用户列表

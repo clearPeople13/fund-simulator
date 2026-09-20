@@ -195,6 +195,7 @@ const todayPnl = computed(() => {
 
 // 手动分析状态
 const isAnalyzing = ref<boolean>(false)
+const analysisMode = ref<'rule' | 'ai'>('rule')  // 规则模式 / AI 模式
 const analysisProgress = ref<number>(0)
 const analysisMessage = ref<string>('')
 
@@ -577,7 +578,8 @@ const triggerManualAnalysis = async () => {
     
     const analyzeRes = await axios.post('/api/ai/analyze', {
       fund_codes: fundCodes,
-      user_id: currentUser.value?.id || 'default'
+      user_id: currentUser.value?.id || 'default',
+      mode: analysisMode.value  // rule / ai
     })
     
     // API 返回后，进度条到 100%
@@ -948,6 +950,19 @@ onMounted(() => {
       </div>
       <div class="status-right">
         <span class="next-analysis">下次分析：{{ aiStatusDisplay.nextAnalysis }}</span>
+        <!-- 模式切换：规则 / AI -->
+        <div class="mode-switch">
+          <button 
+            class="mode-btn" 
+            :class="{ active: analysisMode === 'rule' }"
+            @click="analysisMode = 'rule'"
+          >规则</button>
+          <button 
+            class="mode-btn ai" 
+            :class="{ active: analysisMode === 'ai' }"
+            @click="analysisMode = 'ai'"
+          >🤖 AI</button>
+        </div>
         <button 
           class="refresh-btn" 
           :class="{ disabled: isAnalyzing }"

@@ -194,7 +194,9 @@ module.exports = function aiRoutes(ctx) {
   // 触发AI分析
   r.post('/analyze', async (req, res) => {
     try {
-      let { fund_codes, user_id } = req.body;
+      let { fund_codes, user_id, mode } = req.body;
+      // mode: 'rule'（规则引擎，默认）| 'ai'（MIMO Pro 2.5 大模型）
+      const analysisMode = mode || 'rule';
       const userId = user_id || getCurrentUser();
       if (!userConfigs[userId]) return res.status(404).json({ error: '用户不存在' });
       if (!fund_codes || !Array.isArray(fund_codes) || fund_codes.length === 0) {
@@ -212,7 +214,35 @@ module.exports = function aiRoutes(ctx) {
         const code = fund_codes[i];
         aiAnalysisStatus.progress = Math.round(((i + 1) / fund_codes.length) * 100);
         aiAnalysisStatus.currentPhase = `分析 ${code}...`;
-        const sig = await getFundSignal(code);
+        let sig;
+        if (analysisMode === 'ai') {
+          // AI 模式：MIMO Pro 2.5 大模型分析
+          try {
+            const { analyzeFund } = require('../ai-advisor');
+            const user = userConfigs[userId] || {};
+            const aiResult = await analyzeFund({
+              fund_name: code, fund_code: code,
+              latest_nav: null, daily_return: 0,
+              change_5d: 0, change_20d: 0,
+              drawdown_60d: 0, above_ma20: true
+            }, user.style || '稳健型');
+            sig = {
+              latest_nav: null,
+              signal: {
+                action: aiResult.decision === 'BUY' ? 'buy' : (aiResult.decision === 'SELL' ? 'sell' : 'hold'),
+                label: 'AI分析',
+                reason: aiResult.reason
+              },
+              confidence: aiResult.confidence
+            };
+          } catch (aiErr) {
+            console.error('[AI] 分析失败: ' + aiErr.message);
+            sig = await getFundSignal(code); // 降级到规则引擎
+          }
+        } else {
+          // 规则模式：原来的 getFundSignal（保留不动）
+          sig = await getFundSignal(code);
+        }
         signals[code] = sig;
         if (!sig || !sig.signal || sig.latest_nav == null) {
           analysisResults[code] = {

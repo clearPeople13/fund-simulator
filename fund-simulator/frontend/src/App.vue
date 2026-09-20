@@ -109,14 +109,11 @@ onMounted(() => {
           <div class="logo">
             <div class="logo-mark">
               <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 20 L10 14 L16 18 L22 8 L28 12" stroke="url(#logoGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="22" cy="8" r="3" fill="#22d3ee"/>
-                <defs>
-                  <linearGradient id="logoGrad" x1="4" y1="20" x2="28" y2="8">
-                    <stop offset="0%" stop-color="#6366f1"/>
-                    <stop offset="100%" stop-color="#22d3ee"/>
-                  </linearGradient>
-                </defs>
+                <rect x="6" y="18" width="4" height="8" rx="1" fill="#6366f1" opacity="0.6"/>
+                <rect x="12" y="14" width="4" height="12" rx="1" fill="#8b5cf6" opacity="0.8"/>
+                <rect x="18" y="10" width="4" height="16" rx="1" fill="#22d3ee"/>
+                <path d="M8 12 L14 8 L20 10 L26 4" stroke="#e0e7ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <circle cx="26" cy="4" r="2" fill="#22d3ee"/>
               </svg>
             </div>
             <span class="logo-text">AI自动操盘</span>

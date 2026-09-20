@@ -251,6 +251,7 @@ body {
   font-weight: 600;
   gap: 10px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .logo .logo-icon {
@@ -261,11 +262,12 @@ body {
 .header-menu {
   background: transparent !important;
   border: none !important;
-  flex: 1;
+  flex: 0 1 auto;
   margin-left: 20px;
   line-height: 62px;
   overflow-x: auto;
   overflow-y: hidden;
+  white-space: nowrap;
 }
 
 .header-menu .ant-menu-item {
@@ -293,6 +295,7 @@ body {
 
 .header-right {
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* 用户切换器 */

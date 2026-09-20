@@ -383,17 +383,32 @@ module.exports = function aiRoutes(ctx) {
         result.suggest_amount = suggestAmount;
         suggestions.push({ fund_code: code, signal: action, amount: suggestAmount, reason: sig.signal.reason });
       }
-      const suggestCodes = suggestions.map(s => s.fund_code);
-      // 排版优化：基金代码每行 6 个分组显示
-      const groupSize = 6;
-      const groups = [];
-      for (let i = 0; i < suggestCodes.length; i += groupSize) {
-        groups.push(suggestCodes.slice(i, i + groupSize).join('  '));
+      // 排版优化：每个入场信号基金详细信息一行
+      const detailLines = [];
+      for (const sug of suggestions) {
+        const r = analysisResults[sug.fund_code] || {};
+        const sig = signals[sug.fund_code] || {};
+        // 查基金名称
+        let fundName = sug.fund_code;
+        try {
+          const f = await new Promise((resolve, reject) => {
+            db.get('SELECT fund_name FROM funds WHERE fund_code = ?', [sug.fund_code], (e, row) => e ? reject(e) : resolve(row));
+          });
+          if (f && f.fund_name) fundName = f.fund_name;
+        } catch (e) {}
+        const chg5 = r.change_5d != null ? (r.change_5d >= 0 ? '+' : '') + r.change_5d.toFixed(2) + '%' : '--';
+        const chg20 = r.change_20d != null ? (r.change_20d >= 0 ? '+' : '') + r.change_20d.toFixed(2) + '%' : '--';
+        const nav = sig.latest_nav ? '净值 ' + sig.latest_nav.toFixed(4) : '';
+        detailLines.push(`${sug.fund_code} ${fundName}`);
+        detailLines.push(`  ${nav} | 5日${chg5} 20日${chg20} | 信心${r.confidence || '中'} | 建议¥${sug.amount}`);
+        detailLines.push(`  原因：${(r.signal_reason || '技术面信号').slice(0, 50)}`);
+        detailLines.push('');
       }
       const styleName = (userConfigs[userId] && userConfigs[userId].style) || '未知';
+      const nowStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const msg = suggestions.length > 0
-        ? `【${styleName}】观察池 ${fund_codes.length} 只 | 入场信号 ${suggestions.length} 只\n━━━━━━━━━━━━━━\n📈 入场信号基金：\n${groups.join('\n')}\n━━━━━━━━━━━━━━\n仅供参考，系统不自动交易`
-        : `【${styleName}】观察池 ${fund_codes.length} 只 | 无入场信号，建议观望`;
+        ? `【${styleName}】AI 分析完成\n时间：${nowStr}\n观察池 ${fund_codes.length} 只 | 入场信号 ${suggestions.length} 只\n━━━━━━━━━━━━━━\n${detailLines.join('\n')}━━━━━━━━━━━━━━\n仅供参考，系统不自动交易`
+        : `【${styleName}】AI 分析完成\n时间：${nowStr}\n观察池 ${fund_codes.length} 只 | 无入场信号，建议观望`;
       // 飞书通知：AI 分析完成
       try {
         const { sendFeishu } = require('../notify');

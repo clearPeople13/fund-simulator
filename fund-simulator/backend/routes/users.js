@@ -70,9 +70,14 @@ module.exports = function usersRoutes(ctx) {
     const { id, fundCode } = req.params;
     if (!userConfigs[id]) return res.status(404).json({ error: '用户不存在' });
     try {
-      // 软删除：标记 deleted_by_user=1，AI 不再重新添加
+      // 只允许删除手动添加的，AI 推荐的不能删除
+      const row = await new Promise((resolve, reject) => {
+        db.get('SELECT source FROM watchlist WHERE user_id = ? AND fund_code = ?', [id, fundCode], (e, r) => e ? reject(e) : resolve(r));
+      });
+      if (!row) return res.status(404).json({ error: '基金不在观察池' });
+      if (row.source === 'ai') return res.status(403).json({ error: 'AI 推荐的观察池不能删除，由 AI 维护' });
       await new Promise((resolve, reject) => {
-        db.run('UPDATE watchlist SET deleted_by_user = 1 WHERE user_id = ? AND fund_code = ?', [id, fundCode], e => e ? reject(e) : resolve());
+        db.run('DELETE FROM watchlist WHERE user_id = ? AND fund_code = ?', [id, fundCode], e => e ? reject(e) : resolve());
       });
       res.json({ message: '已取消自选', watchlist: await getWatchlist(id) });
     } catch (e) { res.status(500).json({ error: e.message }); }

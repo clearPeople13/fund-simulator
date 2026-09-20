@@ -277,8 +277,10 @@ const loadAllData = async () => {
       aiStatusDisplay.value.lastAnalysis = formatDate(aiRes.data.lastAnalysis)
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('加载数据失败:', error)
+    const errMsg = error?.response?.data?.error || error?.message || '未知错误'
+    message.error('数据加载失败: ' + errMsg + '（后端可能正在分析，请稍后刷新）')
   } finally {
     loading.value = false
     setTimeout(() => initCharts(), 100)

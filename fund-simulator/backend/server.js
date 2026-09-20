@@ -1749,12 +1749,10 @@ async function saveDailySnapshot(userId) {
 }
 
 // AI分析状态
+// 按用户区分的分析状态（default/aggressive 各自独立）
 let aiAnalysisStatus = {
-  status: 'idle',
-  lastAnalysis: null,
-  nextAnalysis: null,
-  progress: 0,
-  currentPhase: ''
+  default: { status: 'idle', lastAnalysis: null, nextAnalysis: null, progress: 0, currentPhase: '' },
+  aggressive: { status: 'idle', lastAnalysis: null, nextAnalysis: null, progress: 0, currentPhase: '' }
 };
 
 // AI分析结果存储

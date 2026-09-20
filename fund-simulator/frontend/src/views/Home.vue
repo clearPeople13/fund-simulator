@@ -1436,7 +1436,7 @@ onMounted(() => {
               <span class="watch-type">{{ fund.type }}</span>
               <span v-if="fund.source === 'ai'" class="watch-source-ai" title="由AI按当前用户性格自动筛选">AI推荐</span>
               <span v-else class="watch-source-manual" title="手动添加">手动</span>
-              <button class="watch-remove" title="取消自选" @click.stop="removeWatch(fund)">✕</button>
+              <button v-if="fund.source !== 'ai'" class="watch-remove" title="取消自选" @click.stop="removeWatch(fund)">✕</button>
             </div>
             <div class="watch-name">{{ fund.name }}</div>
             <div class="watch-price">

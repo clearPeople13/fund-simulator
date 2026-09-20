@@ -1338,6 +1338,18 @@ async function generateDailyRecap() {
     lines.push('');
     lines.push('## 明日关注');
     lines.push('- ' + (cfg.name || userId) + '（' + (cfg.style || '') + '）：止损线 -' + ((cfg.stop_loss || 0.05) * 100).toFixed(0) + '%，止盈线 +' + ((cfg.take_profit || 0.2) * 100).toFixed(0) + '%');
+    // 持仓基金表现
+    const hs = pf.holdings || [];
+    if (hs.length) {
+      const topGain = hs.reduce((a, b) => (b.pnl_pct || 0) > (a.pnl_pct || 0) ? b : a);
+      const topLoss = hs.reduce((a, b) => (b.pnl_pct || 0) < (a.pnl_pct || 0) ? b : a);
+      lines.push('- 持仓表现：' + topGain.fund_name + ' +' + (topGain.pnl_pct || 0).toFixed(2) + '% 领涨，' + topLoss.fund_name + ' ' + (topLoss.pnl_pct || 0).toFixed(2) + '% 领跌');
+    }
+    // 热点方向
+    if (hotspots && hotspots.themes && hotspots.themes.length) {
+      const topTheme = hotspots.themes[0];
+      lines.push('- 热点方向：' + topTheme.name + '（热度' + topTheme.score + '），' + (topTheme.avg_chg >= 0 ? '涨' : '跌') + (Math.abs(topTheme.avg_chg || 0)).toFixed(2) + '%');
+    }
     lines.push('- 关注持仓退场信号与观察池入场信号，' + (cfg.watchlist_style || '') + ' 方向标的优先');
     const content = lines.join('\n');
     await new Promise((resolve) => {
@@ -1890,6 +1902,8 @@ async function runNavSyncOnce() {
         console.error(`[净值同步] 保存快照失败 ${userId}: ${snapErr.message}`);
       }
     }
+    // 净值同步完成后生成每日复盘（确保当日净值已公布）
+    try { await generateDailyRecap(); console.log('[净值同步] 每日复盘已生成'); } catch (recapErr) { console.error('[净值同步] 复盘失败: ' + recapErr.message); }
   } catch (e) {
     console.error('[净值同步] 任务异常: ' + e.message);
   }
@@ -2403,10 +2417,7 @@ async function performAnalysis(analysisType, auto = false) {
           }
         } catch (p1Err) { console.error(`[P1] ${userId} 失败:`, p1Err.message); }
       }
-      // 每日复盘（仅收盘分析时生成，避免盘中每30分钟重复生成）
-      if (analysisType === 'close') {
-        try { await generateDailyRecap(); } catch (e) { console.error('[复盘] 失败:', e.message); }
-      }
+      // 每日复盘已移至净值同步后生成（21:30），此处不再调用
     }
 
     console.log(`\n=== ${typeNames[analysisType]}完成 ===\n`);

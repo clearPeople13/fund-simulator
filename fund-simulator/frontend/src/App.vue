@@ -347,6 +347,46 @@ body {
 .header-right {
   margin-left: auto;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 全局模式切换：规则 / AI */
+.global-mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 4px;
+}
+
+.global-mode-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.global-mode-btn:hover {
+  color: #fff;
+}
+
+.global-mode-btn.active {
+  background: #1890ff;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+
+.global-mode-btn.ai.active {
+  background: #722ed1;
+  box-shadow: 0 2px 8px rgba(114, 46, 209, 0.3);
 }
 
 /* 用户切换器 */

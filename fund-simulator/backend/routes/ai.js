@@ -151,7 +151,13 @@ module.exports = function aiRoutes(ctx) {
         const fund = await new Promise((resolve) => {
           db.get('SELECT fund_name FROM funds WHERE fund_code = ?', [tx.fund_code], (e, row) => resolve(e ? null : row));
         });
-        enriched.push({ ...tx, fund_name: fund ? fund.fund_name : tx.fund_code });
+        // 时间戳格式化成北京时间
+        let formattedDate = tx.transaction_date;
+        if (typeof tx.transaction_date === 'number') {
+          const d = new Date(tx.transaction_date);
+          formattedDate = d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+        }
+        enriched.push({ ...tx, fund_name: fund ? fund.fund_name : tx.fund_code, formatted_date: formattedDate });
       }
       const pendingRows = await new Promise((resolve, reject) => {
         db.all("SELECT id, fund_code, order_type, amount, shares, price, fee, status, order_date, trade_date, reason FROM orders WHERE user_id = ? AND status = 'SUBMITTED' ORDER BY id DESC", [userId], (e, rows) => e ? reject(e) : resolve(rows || []));

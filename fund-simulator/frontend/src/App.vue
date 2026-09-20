@@ -252,6 +252,7 @@ body {
   gap: 10px;
   white-space: nowrap;
   flex-shrink: 0;
+  margin-right: auto;
 }
 
 .logo .logo-icon {
@@ -262,7 +263,7 @@ body {
 .header-menu {
   background: transparent !important;
   border: none !important;
-  flex: 0 1 auto;
+  flex: 1;
   margin-left: 20px;
   line-height: normal;
   overflow-x: auto;

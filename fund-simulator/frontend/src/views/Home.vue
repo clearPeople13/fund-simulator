@@ -950,19 +950,6 @@ onMounted(() => {
       </div>
       <div class="status-right">
         <span class="next-analysis">下次分析：{{ aiStatusDisplay.nextAnalysis }}</span>
-        <!-- 模式切换：规则 / AI -->
-        <div class="mode-switch">
-          <button 
-            class="mode-btn" 
-            :class="{ active: analysisMode === 'rule' }"
-            @click="analysisMode = 'rule'"
-          >规则</button>
-          <button 
-            class="mode-btn ai" 
-            :class="{ active: analysisMode === 'ai' }"
-            @click="analysisMode = 'ai'"
-          >🤖 AI</button>
-        </div>
         <button 
           class="refresh-btn" 
           :class="{ disabled: isAnalyzing }"

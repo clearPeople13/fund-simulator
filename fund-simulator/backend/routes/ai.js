@@ -196,7 +196,7 @@ module.exports = function aiRoutes(ctx) {
     try {
       let { fund_codes, user_id, mode } = req.body;
       // mode: 'rule'（规则引擎，默认）| 'ai'（MIMO Pro 2.5 大模型）
-      const analysisMode = mode || 'rule';
+      const analysisMode = mode || 'ai';  // 默认走 AI，失败自动降级到规则
       const userId = user_id || getCurrentUser();
       if (!userConfigs[userId]) return res.status(404).json({ error: '用户不存在' });
       if (!fund_codes || !Array.isArray(fund_codes) || fund_codes.length === 0) {
@@ -236,11 +236,12 @@ module.exports = function aiRoutes(ctx) {
               confidence: aiResult.confidence
             };
           } catch (aiErr) {
-            console.error('[AI] 分析失败: ' + aiErr.message);
+            console.error(`[AI] ${code} 分析失败: ${aiErr.message}，降级到规则引擎`);
             sig = await getFundSignal(code); // 降级到规则引擎
           }
         } else {
           // 规则模式：原来的 getFundSignal（保留不动）
+          console.log(`[分析] ${code} 走规则引擎`);
           sig = await getFundSignal(code);
         }
         signals[code] = sig;

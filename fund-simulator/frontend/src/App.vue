@@ -18,7 +18,7 @@ const router = useRouter()
 const route = useRoute()
 
 // 全局分析模式：rule（规则引擎）| ai（MIMO Pro 2.5）
-const analysisMode = ref<'rule' | 'ai'>('rule')
+const analysisMode = ref<'rule' | 'ai'>('ai')  // 默认走 AI
 
 // 导航菜单高亮跟随当前路由（切换用户刷新后仍保持正确对应）
 const activeIndex = computed(() => {

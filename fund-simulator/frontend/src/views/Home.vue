@@ -1999,7 +1999,7 @@ onMounted(() => {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .data-table th {
@@ -2020,7 +2020,7 @@ onMounted(() => {
 
 .data-table .code { font-family: 'SF Mono', monospace; color: #6366f1; }
 
-.data-table .name { font-weight: 500; color: var(--text); }
+.data-table .name { font-weight: 500; color: var(--text); white-space: normal; min-width: 140px; max-width: 200px; line-height: 1.4; }
 
 .data-table .number { text-align: right; font-family: 'SF Mono', monospace; }
 

@@ -298,7 +298,7 @@ body {
   flex: 1;
   margin-left: 20px;
   line-height: normal;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   white-space: nowrap;
 }

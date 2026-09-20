@@ -973,6 +973,28 @@ onMounted(() => {
       <div class="progress-text">{{ analysisMessage }} ({{ analysisProgress }}%)</div>
     </div>
 
+    <!-- AI 状态横幅：今日盈亏大字 + AI 当前动作（实时） -->
+    <div class="ai-banner">
+      <div class="ai-banner-left">
+        <div class="ai-banner-label">今日盈亏</div>
+        <div class="ai-banner-value" :class="todayPnl === null ? '' : (todayPnl >= 0 ? 'up' : 'down')">
+          <template v-if="todayPnl === null">待更新</template>
+          <template v-else>{{ todayPnl >= 0 ? '+' : '' }}¥{{ todayPnl.toFixed(2) }}</template>
+        </div>
+        <div class="ai-banner-sub">
+          累计 <span :class="totalPnl >= 0 ? 'up' : 'down'">{{ totalPnl >= 0 ? '+' : '' }}¥{{ totalPnl.toFixed(2) }}</span>
+          · 收益率 <span :class="parseFloat(totalPnlRate) >= 0 ? 'up' : 'down'">{{ totalPnlRate }}%</span>
+        </div>
+      </div>
+      <div class="ai-banner-right">
+        <span class="ai-banner-dot" :class="liveStatus === 'live' ? 'on' : 'off'"></span>
+        <div class="ai-banner-ai">
+          <div class="ai-banner-ai-label">AI 当前动作</div>
+          <div class="ai-banner-ai-msg">{{ liveLogs[0] ? liveLogs[0].message : '等待 AI 下次分析（交易日盘中每 30 分钟）…' }}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 资产总览卡片 -->
     <div class="overview-cards">
       <div class="overview-card primary">
@@ -1669,6 +1691,22 @@ onMounted(() => {
 .cmp-v { color: #cbd5e1; font-weight: 600; }
 .cmp-chart { width: 100%; height: 240px; }
 .muted { color: #64748b; font-size: 12px; font-weight: 400; }
+.ai-banner { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(15,23,42,0.6)); border: 1px solid rgba(99,102,241,0.25); margin-bottom: 16px; }
+.ai-banner-label { font-size: 13px; color: #94a3b8; }
+.ai-banner-value { font-size: 40px; font-weight: 800; line-height: 1.1; margin: 4px 0; }
+.ai-banner-value.up { color: var(--up); }
+.ai-banner-value.down { color: var(--down); }
+.ai-banner-sub { font-size: 13px; color: #94a3b8; }
+.ai-banner-sub .up { color: var(--up); font-weight: 600; }
+.ai-banner-sub .down { color: var(--down); font-weight: 600; }
+.ai-banner-right { display: flex; align-items: center; gap: 10px; max-width: 420px; }
+.ai-banner-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.ai-banner-dot.on { background: var(--up); box-shadow: 0 0 8px var(--up); animation: pulse 2s infinite; }
+.ai-banner-dot.off { background: #64748b; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.ai-banner-ai-label { font-size: 11px; color: #64748b; }
+.ai-banner-ai-msg { font-size: 13px; color: #cbd5e1; margin-top: 2px; }
 .live-log-box { background: rgba(0,0,0,0.25); border: 1px solid rgba(99,102,241,0.18); border-radius: 10px; padding: 10px 12px; max-height: 280px; overflow-y: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; }
 .live-empty { color: #64748b; text-align: center; padding: 24px 0; font-family: sans-serif; }
 .live-log-line { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; border-bottom: 1px dashed rgba(148,163,184,0.08); }

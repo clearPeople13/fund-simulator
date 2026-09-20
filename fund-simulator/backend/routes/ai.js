@@ -262,7 +262,7 @@ module.exports = function aiRoutes(ctx) {
       // 飞书通知：AI 分析完成
       try {
         const { sendFeishu } = require('../notify');
-        sendFeishu('AI分析完成', userId + ' ' + msg);
+        await sendFeishu('AI分析完成', userId + ' ' + msg);
       } catch (e) { console.error('[飞书] 分析通知失败: ' + e.message); }
       res.json({
         message: msg,

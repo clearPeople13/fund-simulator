@@ -8,6 +8,17 @@ module.exports = function readonlyRoutes(ctx) {
   const r = Router();
   const { db, getCurrentUser, getRiskParams } = ctx;
 
+  // 时间戳（毫秒）转 YYYY-MM-DD（本地北京日期）
+  function tsToDateStr(ts) {
+    if (ts == null) return null;
+    const d = typeof ts === 'number' ? new Date(ts) : new Date(Number(ts));
+    if (isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
   r.get('/reports', async (req, res) => {
     try {
       const userId = req.query.user_id || getCurrentUser();
@@ -61,12 +72,12 @@ module.exports = function readonlyRoutes(ctx) {
       });
       const dayShares = {}; let shares = 0; let firstDay = null;
       for (const tx of txs) {
-        const day = String(tx.transaction_date).slice(0, 10);
+        const day = tsToDateStr(tx.transaction_date);
         if (tx.transaction_type === 'BUY') shares += tx.shares; else shares -= tx.shares;
         dayShares[day] = shares;
         if (firstDay === null || day < firstDay) firstDay = day;
       }
-      const buyDays = new Set(txs.filter(t => t.transaction_type === 'BUY').map(t => String(t.transaction_date).slice(0, 10)));
+      const buyDays = new Set(txs.filter(t => t.transaction_type === 'BUY').map(t => tsToDateStr(t.transaction_date)));
       const rows = []; let lastShares = 0;
       for (let i = 0; i < navs.length; i++) {
         const n = navs[i];
@@ -95,12 +106,12 @@ module.exports = function readonlyRoutes(ctx) {
         const navs = await all('SELECT nav_date, unit_nav FROM fund_nav WHERE fund_code = ? ORDER BY nav_date ASC', [fundCode]);
         const dayShares = {}; let shares = 0; let firstDay = null;
         for (const tx of txs) {
-          const day = String(tx.transaction_date).slice(0, 10);
+          const day = tsToDateStr(tx.transaction_date);
           if (tx.transaction_type === 'BUY') shares += tx.shares; else shares -= tx.shares;
           dayShares[day] = shares;
           if (firstDay === null || day < firstDay) firstDay = day;
         }
-        const buyDays = new Set(txs.filter(t => t.transaction_type === 'BUY').map(t => String(t.transaction_date).slice(0, 10)));
+        const buyDays = new Set(txs.filter(t => t.transaction_type === 'BUY').map(t => tsToDateStr(t.transaction_date)));
         let lastShares = 0;
         for (let i = 0; i < navs.length; i++) {
           const n = navs[i];

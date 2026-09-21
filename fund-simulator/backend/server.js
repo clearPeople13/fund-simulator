@@ -1963,12 +1963,12 @@ function scheduleAnalysis() {
   console.log('=== 定时分析任务配置 ===');
   console.log('');
   console.log('分析频率:');
-  console.log('  - 实时分析: 每30分钟（交易时间内）');
+  console.log('  - 实时分析: 每60分钟（交易时间内）');
   console.log('  - 收盘前分析: 每日14:30');
   console.log('  - 收盘分析: 每日15:00');
   console.log('');
   
-  // 1. 实时分析 - 每30分钟
+  // 1. 实时分析 - 每60分钟
   scheduleRealtimeAnalysis();
   
   // 2. 收盘前分析 - 每日14:30
@@ -2097,7 +2097,7 @@ function scheduleUniverseSync() {
   console.log('[全市场基金库] 每日 22:05 自动刷新（首次 ' + target.toLocaleString() + '）');
 }
 
-// 实时分析 - 每30分钟
+// 实时分析 - 每60分钟
 function scheduleRealtimeAnalysis() {
   const now = new Date();
   const hour = now.getHours();
@@ -2111,10 +2111,10 @@ function scheduleRealtimeAnalysis() {
     
     // 计算到下一个30分钟间隔的时间
     const nextSlot = new Date(now);
-    nextSlot.setMinutes(Math.ceil(minute / 30) * 30, 0, 0);
+    nextSlot.setMinutes(Math.ceil(minute / 60) * 60, 0, 0);
     
     if (nextSlot <= now) {
-      nextSlot.setMinutes(nextSlot.getMinutes() + 30);
+      nextSlot.setMinutes(nextSlot.getMinutes() + 60);
     }
     
     const delay = nextSlot.getTime() - now.getTime();
@@ -2123,16 +2123,16 @@ function scheduleRealtimeAnalysis() {
     let realtimeTimer = null;
     setTimeout(() => {
       performAnalysis('realtime', true);
-      // 之后每30分钟执行一次；检测到收盘/盘外自动停掉，重排到下一交易日 9:30
+      // 之后每60分钟执行一次；检测到收盘/盘外自动停掉，重排到下一交易日 9:30
       realtimeTimer = setInterval(() => {
         if (!isMarketOpenNow()) {
-          console.log('[实时分析] 已收盘/非交易时段，停止半小时循环，重排到下一交易日 9:30');
+          console.log('[实时分析] 已收盘/非交易时段，停止小时循环，重排到下一交易日 9:30');
           clearInterval(realtimeTimer);
           scheduleRealtimeAnalysis();
           return;
         }
         performAnalysis('realtime', true);
-      }, 30 * 60 * 1000);
+      }, 60 * 60 * 1000);
     }, delay);
   } else {
     // 非交易时间，计算到下一个交易时间的延迟
@@ -2229,6 +2229,7 @@ async function performAnalysis(analysisType, auto = false) {
     console.log(`[${analysisType}] 非交易日（周末/节假日），跳过`);
     return;
   }
+  const _startTime = Date.now();
   logAi('phase', { phase: 'start', message: `${typeNames[analysisType]}开始` });
   console.log(`\n=== ${typeNames[analysisType]}开始 ===`);
   console.log(`时间: ${new Date().toLocaleString('zh-CN')}`);
@@ -2537,12 +2538,14 @@ async function performAnalysis(analysisType, auto = false) {
       // 每日复盘已移至净值同步后生成（21:30），此处不再调用
     }
 
-    console.log(`\n=== ${typeNames[analysisType]}完成 ===\n`);
+    const _elapsed = ((Date.now() - _startTime) / 1000).toFixed(1);
+    console.log(`\n=== ${typeNames[analysisType]}完成（耗时 ${_elapsed}s）===\n`);
     // 飞书通知：AI 分析完成
     try {
       const { sendFeishu } = require('./notify');
       const typeName = { realtime: '实时分析', pre_close: '收盘前分析', close: '收盘分析' }[analysisType] || analysisType;
-      sendFeishu('AI' + typeName + '完成', new Date().toLocaleString('zh-CN') + ' ' + typeName + '已完成，见分析页');
+      const _elapsed = ((Date.now() - _startTime) / 1000).toFixed(1);
+      sendFeishu('AI' + typeName + '完成', new Date().toLocaleString('zh-CN') + '\n' + typeName + '已完成，耗时 ' + _elapsed + 's，见分析页');
     } catch (e) { console.error('[飞书] 分析通知失败: ' + e.message); }
     
   } catch (error) {

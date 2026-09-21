@@ -264,6 +264,8 @@ module.exports = function aiRoutes(ctx) {
       if (fund_codes.length === 0) {
         return res.json({ message: '观察池为空，请先在基金库中添加自选基金', results: {}, trades: [] });
       }
+      const _analysisStart = Date.now();
+      const _analysisStartStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
       aiAnalysisStatus.status = 'running';
       aiAnalysisStatus.progress = 0;
       aiAnalysisStatus.currentPhase = '开始分析...';
@@ -407,8 +409,8 @@ module.exports = function aiRoutes(ctx) {
       const styleName = (userConfigs[userId] && userConfigs[userId].style) || '未知';
       const nowStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const msg = suggestions.length > 0
-        ? `【${styleName}】AI 分析完成\n时间：${nowStr}\n观察池 ${fund_codes.length} 只 | 入场信号 ${suggestions.length} 只\n━━━━━━━━━━━━━━\n${detailLines.join('\n')}━━━━━━━━━━━━━━\n仅供参考，系统不自动交易`
-        : `【${styleName}】AI 分析完成\n时间：${nowStr}\n观察池 ${fund_codes.length} 只 | 无入场信号，建议观望`;
+        ? `【${styleName}】AI 分析完成\n时间：${nowStr}\n观察池 ${fund_codes.length} 只 | 入场信号 ${suggestions.length} 只\n━━━━━━━━━━━━━━\n${detailLines.join('\n')}━━━━━━━━━━━━━━\n仅供参考，系统不自动交易\n━━━━━━━━━━━━━━\n开始：${_analysisStartStr}\n结束：${nowStr}\n耗时：${(() => { const _sec = (Date.now() - _analysisStart) / 1000; if (_sec < 60) return _sec.toFixed(1) + '秒'; if (_sec < 3600) return Math.floor(_sec/60) + '分' + Math.round(_sec%60) + '秒'; return Math.floor(_sec/3600) + '时' + Math.floor((_sec%3600)/60) + '分' + Math.round(_sec%60) + '秒'; })()}`
+        : `【${styleName}】AI 分析完成\n开始：${_analysisStartStr}\n结束：${nowStr}\n耗时：${((Date.now() - _analysisStart) / 1000).toFixed(1)}s\n观察池 ${fund_codes.length} 只 | 无入场信号，建议观望`;
       // 飞书通知：AI 分析完成
       try {
         const { sendFeishu } = require('../notify');

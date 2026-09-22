@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { UserOutlined, SafetyCertificateOutlined, FundOutlined } from '@ant-design/icons-vue'
+import { message, Modal } from 'ant-design-vue'
+import { UserOutlined, SafetyCertificateOutlined, FundOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 
 interface User {
   id: string
@@ -14,18 +15,30 @@ interface User {
 const users = ref<User[]>([])
 const paramsMap = ref<Record<string, any>>({})
 const loading = ref(false)
+const addModalVisible = ref(false)
+const adding = ref(false)
+const form = ref({
+  name: '',
+  style: '稳健型',
+  initial_capital: 100000,
+  description: ''
+})
 
 const loadAll = async () => {
   loading.value = true
   try {
-    const res = await axios.get('/api/users')
-    users.value = res.data
-    for (const u of res.data) {
-      const p = await axios.get(`/api/risk/params/${u.id}`)
-      paramsMap.value[u.id] = p.data.params || {}
+    const res = await axios.get('/api/roles')
+    users.value = res.data.roles
+    for (const u of res.data.roles) {
+      try {
+        const p = await axios.get(`/api/risk/params/${u.id}`)
+        paramsMap.value[u.id] = p.data.params || {}
+      } catch(e) {
+        paramsMap.value[u.id] = u
+      }
     }
   } catch (error) {
-    console.error('加载性格配置失败:', error)
+    console.error('加载角色失败:', error)
   } finally {
     loading.value = false
   }
@@ -53,6 +66,46 @@ const paramRows = (userId: string) => {
   return rows
 }
 
+const isDefaultRole = (id: string) => id === 'default' || id === 'aggressive'
+
+const handleAdd = async () => {
+  if (!form.value.name) {
+    message.warning('请输入角色名称')
+    return
+  }
+  adding.value = true
+  try {
+    await axios.post('/api/roles', form.value)
+    message.success(`角色「${form.value.name}」已创建，AI 将自动开始按性格操作`)
+    addModalVisible.value = false
+    form.value = { name: '', style: '稳健型', initial_capital: 100000, description: '' }
+    await loadAll()
+  } catch (e: any) {
+    message.error(e.response?.data?.error || '创建失败')
+  } finally {
+    adding.value = false
+  }
+}
+
+const handleDelete = (u: User) => {
+  Modal.confirm({
+    title: `删除角色「${u.name}」？`,
+    content: '删除后该角色不再自动运行，持仓和交易记录保留。',
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await axios.delete(`/api/roles/${u.id}`)
+        message.success('角色已删除')
+        await loadAll()
+      } catch (e: any) {
+        message.error(e.response?.data?.error || '删除失败')
+      }
+    }
+  })
+}
+
 onMounted(loadAll)
 </script>
 
@@ -61,8 +114,12 @@ onMounted(loadAll)
     <div class="page-header">
       <div>
         <h1 class="page-title"><UserOutlined /> AI 基金经理画像</h1>
-        <p class="page-desc">每个用户是一位独立的 AI 基金经理，性格参数驱动全部交易决策（只读展示）</p>
+        <p class="page-desc">每个角色是一位独立的 AI 基金经理，性格参数驱动全部交易决策。可添加新角色，AI 会自动按性格跑流程。</p>
       </div>
+      <a-button type="primary" @click="addModalVisible = true">
+        <template #icon><PlusOutlined /></template>
+        添加 AI 角色
+      </a-button>
     </div>
 
     <div class="profile-grid">
@@ -80,6 +137,16 @@ onMounted(loadAll)
               <div class="profile-name">{{ u.name }}</div>
               <a-tag :color="u.style === '激进型' ? 'volcano' : 'processing'">{{ u.style }}</a-tag>
             </div>
+            <a-button
+              v-if="!isDefaultRole(u.id)"
+              type="text"
+              danger
+              size="small"
+              class="delete-btn"
+              @click="handleDelete(u)"
+            >
+              <template #icon><DeleteOutlined /></template>
+            </a-button>
           </div>
         </template>
         <p class="profile-desc">{{ u.description }}</p>
@@ -105,6 +172,27 @@ onMounted(loadAll)
         </div>
       </a-card>
     </div>
+
+    <!-- 添加角色弹窗 -->
+    <a-modal v-model:open="addModalVisible" title="添加 AI 角色" :confirm-loading="adding" @ok="handleAdd">
+      <a-form layout="vertical" style="margin-top: 16px">
+        <a-form-item label="角色名称" required>
+          <a-input v-model:value="form.name" placeholder="如：稳健型小白、趋势猎手..." />
+        </a-form-item>
+        <a-form-item label="投资风格">
+          <a-radio-group v-model:value="form.style">
+            <a-radio value="稳健型">🛡️ 稳健型（低风险、严格止损、分散持仓）</a-radio>
+            <a-radio value="激进型">🚀 激进型（高风险、追求收益、集中持仓）</a-radio>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item label="初始资金">
+          <a-input-number v-model:value="form.initial_capital" :min="10000" :step="10000" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="角色描述">
+          <a-input v-model:value="form.description" placeholder="一句话描述这个 AI 的投资理念..." />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -112,12 +200,13 @@ onMounted(loadAll)
 .page { display: flex; flex-direction: column; gap: 16px; max-width: 1080px; margin: 0 auto; width: 100%; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; }
 .page-title { font-size: 22px; color: var(--text); display: flex; align-items: center; gap: 8px; }
-.page-desc { color: var(--text-secondary); margin-top: 4px; }
+.page-desc { color: var(--text-secondary); margin-top: 4px; max-width: 600px; }
 .profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .profile-card { background: var(--card); border-radius: var(--radius-md); }
 .profile-head { display: flex; align-items: center; gap: 10px; }
 .avatar { font-size: 30px; }
 .profile-name { font-size: 16px; color: var(--text); font-weight: 600; margin-bottom: 2px; }
+.delete-btn { margin-left: auto; }
 .profile-desc { color: var(--text-secondary); font-size: 13px; margin: 8px 0 16px; }
 .param-section { margin-top: 12px; }
 .param-title { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }

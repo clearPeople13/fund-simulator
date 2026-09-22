@@ -450,6 +450,52 @@ const userConfigs = {
   }
 };
 
+// 从数据库加载所有 AI 角色到 userConfigs（动态添加角色后自动生效）
+function loadUserConfigsFromDB() {
+  return new Promise((resolve) => {
+    db.all('SELECT * FROM ai_roles', (err, rows) => {
+      if (err) { console.error('[角色] 加载失败:', err.message); return resolve(); }
+      for (const row of rows) {
+        const uid = row.id;
+        // 保留原有 fund_list/watchlist（如果有）
+        const existing = userConfigs[uid] || {};
+        let base_weights = {};
+        try { base_weights = JSON.parse(row.base_weights || '{}'); } catch(e) {}
+        userConfigs[uid] = {
+          ...existing,
+          id: uid,
+          name: row.name,
+          avatar: row.avatar || '👤',
+          style: row.style,
+          description: row.description || '',
+          initial_capital: row.initial_capital || 100000,
+          risk_tolerance: row.risk_tolerance || 'medium',
+          target_return: row.target_return || 0.10,
+          stop_loss: row.stop_loss || 0.05,
+          take_profit: row.take_profit || 0.20,
+          max_position: row.max_position || 0.60,
+          max_single_fund: row.max_single_fund || 0.20,
+          min_hold_funds: row.min_hold_funds || 3,
+          max_drawdown: row.max_drawdown || 0.10,
+          exit_drawdown: row.exit_drawdown || 15,
+          exit_style: row.exit_style || 'timely',
+          entry_signal_threshold: row.entry_signal_threshold || 'strong',
+          buy_ratio: row.buy_ratio || 0.2,
+          add_ratio: row.add_ratio || 0.1,
+          add_cooldown_days: row.add_cooldown_days || 5,
+          rebalance_frequency: row.rebalance_frequency || 'monthly',
+          watchlist_style: row.watchlist_style || '均衡分散/大盘蓝筹',
+          base_weights: base_weights,
+          fund_list: existing.fund_list || [],
+          watchlist: existing.watchlist || []
+        };
+      }
+      console.log(`[角色] 已加载 ${rows.length} 个 AI 角色: ${rows.map(r => r.name).join(', ')}`);
+      resolve();
+    });
+  });
+}
+
 // 当前活跃用户（拆 routes 时用 getter/setter 保持引用）
 let currentUser = 'default';
 const getCurrentUser = () => currentUser;
@@ -2597,6 +2643,11 @@ app.use('/api/users', require('./routes/users')({
   db, userConfigs, getCurrentUser, setCurrentUser, getWatchlist, ensureFundWithNav
 }));
 
+// 挂载 AI 角色管理路由
+app.use('/api/roles', require('./routes/roles')({
+  db, userConfigs, getCurrentUser, setCurrentUser
+}));
+
 // 其他请求兜底返回 Vue index.html
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/dist', 'index.html'));
@@ -2657,7 +2708,10 @@ ${Object.entries(pf.holdings || {}).map(([code, h]) => `- ${code}：${h.shares} 
   };
 }
 
-app.listen(PORT, () => {
+// 启动：先从数据库加载角色，再启动服务器
+async function startServer() {
+  await loadUserConfigsFromDB();
+  app.listen(PORT, () => {
   console.log(`基金模拟系统服务器运行在 http://localhost:${PORT}`);
   console.log('');
   console.log('=== 数据持久化说明 ===');
@@ -2697,7 +2751,9 @@ app.listen(PORT, () => {
       }
     }
   }, 1500);
-});
+  });
+}
+startServer();
 
 // 优雅关闭
 process.on('SIGINT', () => {

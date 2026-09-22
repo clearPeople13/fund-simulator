@@ -2230,6 +2230,7 @@ async function performAnalysis(analysisType, auto = false) {
     return;
   }
   const _startTime = Date.now();
+  const _analysisDetails = {}; // {userId: [{code, name, nav, dailyReturn, decision, confidence, reason}]}
   logAi('phase', { phase: 'start', message: `${typeNames[analysisType]}开始` });
   console.log(`\n=== ${typeNames[analysisType]}开始 ===`);
   console.log(`时间: ${new Date().toLocaleString('zh-CN')}`);
@@ -2278,6 +2279,16 @@ async function performAnalysis(analysisType, auto = false) {
         const decision = (action === 'buy' || action === 'add') ? 'BUY' : 'HOLD';
         const confidence = action === 'buy' ? '高' : (action === 'add' ? '中' : '低');
         logAi('signal', { user: (userConfigs[userId]||{}).name || userId, code: fundCode, action, decision, confidence, nav: currentNav, dailyReturn: dailyReturn.toFixed(2), message: `${fundCode} 信号=${action}（置信度${confidence}） 日涨跌${dailyReturn.toFixed(2)}% → ${decision}` });
+        // 收集分析详情用于飞书通知
+        if (!_analysisDetails[userId]) _analysisDetails[userId] = [];
+        _analysisDetails[userId].push({
+          code: fundCode,
+          nav: currentNav,
+          dailyReturn: dailyReturn.toFixed(2),
+          decision: decision,
+          confidence: confidence,
+          reason: (sig && sig.signal && sig.signal.reason) || ''
+        });
         
         // 预估收盘涨跌幅用真实最新日涨跌，不再随机
         const estimatedCloseReturn = dailyReturn;
@@ -2545,7 +2556,22 @@ async function performAnalysis(analysisType, auto = false) {
       const { sendFeishu } = require('./notify');
       const typeName = { realtime: '实时分析', pre_close: '收盘前分析', close: '收盘分析' }[analysisType] || analysisType;
       const _elapsed = ((Date.now() - _startTime) / 1000).toFixed(1);
-      sendFeishu('AI' + typeName + '完成', new Date().toLocaleString('zh-CN') + '\n' + typeName + '已完成，耗时 ' + _elapsed + 's，见分析页');
+      // 拼详情：每个用户的分析结果
+      const _nowStr = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const _detailLines = [];
+      for (const uid of Object.keys(_analysisDetails)) {
+        const _uName = (userConfigs[uid] && userConfigs[uid].name) || uid;
+        const _items = _analysisDetails[uid];
+        const _buys = _items.filter(x => x.decision === 'BUY');
+        _detailLines.push(`【${_uName}】观察池 ${_items.length} 只 | 入场信号 ${_buys.length} 只`);
+        for (const b of _buys.slice(0, 10)) {
+          _detailLines.push(`${b.code} 净值${b.nav} | 日涨跌${b.dailyReturn}% | 信心${b.confidence}`);
+          if (b.reason) _detailLines.push(`  原因：${b.reason.slice(0, 80)}`);
+        }
+        if (_buys.length > 10) _detailLines.push(`... 还有 ${_buys.length - 10} 只`);
+      }
+      const _msg = typeName + '已完成\n时间：' + _nowStr + '\n耗时：' + _elapsed + 's\n━━━━━━━━━━━━━━\n' + (_detailLines.join('\n') || '无分析结果');
+      sendFeishu('AI' + typeName + '完成', _msg);
     } catch (e) { console.error('[飞书] 分析通知失败: ' + e.message); }
     
   } catch (error) {

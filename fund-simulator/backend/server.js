@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const { getUserPortfolio: getUserPortfolioRaw, saveTransaction: saveTransactionRaw, updateHolding: updateHoldingRaw, getAnalysisResults: getAnalysisResultsRaw } = require('./services/portfolio');
 const { buildHotspots: buildHotspotsRaw } = require('./services/hotspots');
 // 统一时间格式化工具：时间戳(ms) -> "2026/09/18 10:24:48" 北京时间
@@ -102,7 +102,7 @@ function initDatabase() {
       inception_date TEXT,
       benchmark TEXT,
       manager TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
 
     // 基金净值表
@@ -113,7 +113,7 @@ function initDatabase() {
       unit_nav REAL,
       acc_nav REAL,
       daily_return REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000),
       FOREIGN KEY (fund_code) REFERENCES funds (fund_code),
       UNIQUE(fund_code, nav_date)
     )`);
@@ -128,7 +128,7 @@ function initDatabase() {
       price REAL NOT NULL,
       shares REAL NOT NULL,
       fees REAL DEFAULT 0,
-      transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      transaction_date INTEGER DEFAULT (strftime('%s','now')*1000),
       reason TEXT,
       FOREIGN KEY (fund_code) REFERENCES funds (fund_code)
     )`);
@@ -141,8 +141,8 @@ function initDatabase() {
       shares REAL DEFAULT 0,
       cost_price REAL,
       total_cost REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000),
+      updated_at INTEGER DEFAULT (strftime('%s','now')*1000),
       UNIQUE(user_id, fund_code)
     )`);
 
@@ -150,7 +150,7 @@ function initDatabase() {
     db.run(`CREATE TABLE IF NOT EXISTS user_configs (
       user_id TEXT PRIMARY KEY,
       config TEXT NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
 
     // 已实现盈亏账本（卖出确认时记录 netProceeds - 卖出成本；正=盈利，负=亏损+赎回费）
@@ -161,7 +161,7 @@ function initDatabase() {
       amount REAL NOT NULL,
       sell_fee REAL DEFAULT 0,
       note TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
 
     // 自选观察池表
@@ -172,7 +172,7 @@ function initDatabase() {
       reason TEXT,
       source TEXT DEFAULT 'manual',
       deleted_by_user INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000),
       UNIQUE(user_id, fund_code),
       FOREIGN KEY (fund_code) REFERENCES funds (fund_code)
     )`);
@@ -213,7 +213,7 @@ function initDatabase() {
       daily_pnl REAL,
       cash REAL,
       market_value REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000),
       UNIQUE(user_id, date)
     )`);
 
@@ -233,7 +233,7 @@ function initDatabase() {
       trade_date TEXT,
       confirm_date TEXT,
       reason TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
 
     // 旧库迁移：orders.trade_date（T 日确认净值日；历史订单默认等于下单日，行为不变）
@@ -249,7 +249,7 @@ function initDatabase() {
       fund_code TEXT PRIMARY KEY,
       buy_fee_pct REAL, sell_fee_7d REAL, sell_fee_1y REAL, sell_fee_ge1y REAL,
       manage_fee_pct REAL, custody_fee_pct REAL, service_fee_pct REAL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -257,7 +257,7 @@ function initDatabase() {
       action TEXT,
       target TEXT,
       detail TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS ai_event_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -279,7 +279,7 @@ function initDatabase() {
       user_id TEXT NOT NULL,
       param_name TEXT NOT NULL,
       param_value TEXT,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at INTEGER DEFAULT (strftime('%s','now')*1000),
       UNIQUE(user_id, param_name)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS risk_events (
@@ -289,7 +289,7 @@ function initDatabase() {
       fund_code TEXT,
       detail TEXT,
       action TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS performance_daily (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -301,7 +301,7 @@ function initDatabase() {
       volatility REAL,
       sharpe REAL,
       max_drawdown REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000),
       UNIQUE(user_id, date)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS reports (
@@ -310,7 +310,7 @@ function initDatabase() {
       report_type TEXT,
       period TEXT,
       content TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS fund_profiles (
       fund_code TEXT PRIMARY KEY,
@@ -318,7 +318,7 @@ function initDatabase() {
       downside_risk REAL,
       style_label TEXT,
       score REAL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS dividends (
       fund_code TEXT NOT NULL,
@@ -326,7 +326,7 @@ function initDatabase() {
       per_unit REAL,
       type TEXT DEFAULT 'CASH',
       nav_before REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000),
       UNIQUE(fund_code, ex_date)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS data_quality_logs (
@@ -335,14 +335,14 @@ function initDatabase() {
       nav_date TEXT,
       issue_type TEXT,
       detail TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS market_env (
       date TEXT PRIMARY KEY,
       avg_fund_chg REAL,
       bench_chg REAL,
       temperature TEXT,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS benchmark_daily (
       date TEXT PRIMARY KEY,
@@ -358,7 +358,7 @@ function initDatabase() {
       signal TEXT,
       reason TEXT,
       metrics TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at INTEGER DEFAULT (strftime('%s','now')*1000)
     )`);
 
     // seedWatchlist();
@@ -373,7 +373,7 @@ function initDatabase() {
       entry_price REAL,
       target_price REAL,
       stop_loss REAL,
-      analysis_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+      analysis_time INTEGER DEFAULT (strftime('%s','now')*1000),
       FOREIGN KEY (fund_code) REFERENCES funds (fund_code)
     )`);
 
@@ -1996,7 +1996,7 @@ db.run(`CREATE TABLE IF NOT EXISTS analysis_logs (
   estimated_pnl REAL,
   signal_label TEXT,
   signal_reason TEXT,
-  analysis_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  analysis_time INTEGER DEFAULT (strftime('%s','now')*1000),
   FOREIGN KEY (fund_code) REFERENCES funds (fund_code)
 )`);
 
@@ -2650,7 +2650,7 @@ app.use('/api/roles', require('./routes/roles')({
 
 // 其他请求兜底返回 Vue index.html
 app.use((req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend/dist', 'index.html'));
+  res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
 });
 
 // 统一错误处理中间件（必须最后挂）

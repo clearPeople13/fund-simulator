@@ -36,12 +36,21 @@ function getUserPortfolio(ctx, userId) {
 function saveTransaction(ctx, userId, transaction) {
   const { db } = ctx;
   return new Promise((resolve, reject) => {
-    const sql = `INSERT INTO transactions (user_id, fund_code, transaction_type, amount, price, shares, fees, reason, remaining_shares)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'BUY' THEN ? ELSE NULL END)`;
-    db.run(sql, [
-      userId, transaction.fund_code, transaction.action, transaction.amount, transaction.price,
-      transaction.shares, transaction.fees || 0, transaction.reason, transaction.action, transaction.shares
-    ], function(err) {
+    // 支持传 transaction_date（成交日）；不传则用数据库默认 CURRENT_TIMESTAMP
+    const hasDate = !!transaction.transaction_date;
+    const cols = hasDate
+      ? `(user_id, fund_code, transaction_type, amount, price, shares, fees, reason, remaining_shares, transaction_date)`
+      : `(user_id, fund_code, transaction_type, amount, price, shares, fees, reason, remaining_shares)`;
+    const placeholders = hasDate
+      ? `(?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'BUY' THEN ? ELSE NULL END, ?)`
+      : `(?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'BUY' THEN ? ELSE NULL END)`;
+    const sql = `INSERT INTO transactions ${cols} VALUES ${placeholders}`;
+    const params = hasDate
+      ? [userId, transaction.fund_code, transaction.action, transaction.amount, transaction.price,
+         transaction.shares, transaction.fees || 0, transaction.reason, transaction.action, transaction.shares, transaction.transaction_date]
+      : [userId, transaction.fund_code, transaction.action, transaction.amount, transaction.price,
+         transaction.shares, transaction.fees || 0, transaction.reason, transaction.action, transaction.shares];
+    db.run(sql, params, function(err) {
       if (err) { reject(err); } else { resolve(this.lastID); }
     });
   });
@@ -51,8 +60,8 @@ function updateHolding(ctx, userId, fundCode, shares, costPrice, totalCost) {
   const { db } = ctx;
   return new Promise((resolve, reject) => {
     const sql = `INSERT OR REPLACE INTO holdings (user_id, fund_code, shares, cost_price, total_cost, updated_at)
-                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`;
-    db.run(sql, [userId, fundCode, shares, costPrice, totalCost], function(err) {
+                 VALUES (?, ?, ?, ?, ?, ?)`;
+    db.run(sql, [userId, fundCode, shares, costPrice, totalCost, Date.now()], function(err) {
       if (err) { reject(err); } else { resolve(); }
     });
   });

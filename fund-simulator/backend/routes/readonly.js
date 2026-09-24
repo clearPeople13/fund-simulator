@@ -8,15 +8,44 @@ module.exports = function readonlyRoutes(ctx) {
   const r = Router();
   const { db, getCurrentUser, getRiskParams } = ctx;
 
-  // 时间戳（毫秒）转 YYYY-MM-DD（本地北京日期）
+  // 时间戳/日期字符串转 YYYY-MM-DD（本地北京日期）
   function tsToDateStr(ts) {
     if (ts == null) return null;
-    const d = typeof ts === 'number' ? new Date(ts) : new Date(Number(ts));
+    let d;
+    if (typeof ts === 'number') {
+      d = new Date(ts);
+    } else if (typeof ts === 'string') {
+      // 支持 '2026-09-21 15:00:00'、'2026-09-21'、ISO 字符串
+      const cleaned = ts.replace(' ', 'T');
+      d = new Date(cleaned);
+      if (isNaN(d.getTime())) d = new Date(Number(ts));
+    } else {
+      d = new Date(ts);
+    }
     if (isNaN(d.getTime())) return null;
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return y + '-' + m + '-' + day;
+  }
+
+  // 毫秒时间戳 → 'YYYY-MM-DD HH:mm:ss'（本地北京时间）
+  function fmtDT(ts) {
+    if (ts == null) return null;
+    let d;
+    if (typeof ts === 'number') d = new Date(ts);
+    else if (typeof ts === 'string') {
+      d = new Date(ts.replace(' ', 'T'));
+      if (isNaN(d.getTime())) d = new Date(Number(ts));
+    } else d = new Date(ts);
+    if (isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${day} ${h}:${min}:${s}`;
   }
 
   r.get('/reports', async (req, res) => {
@@ -247,7 +276,18 @@ module.exports = function readonlyRoutes(ctx) {
   r.get('/ai/activity', async (req, res) => {
     try {
       const userId = req.query.user_id || getCurrentUser();
-      const limit = Math.min(parseInt(req.query.limit) || 15, 50);
+      const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+      // 时间范围过滤：默认当天
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      const startDate = req.query.start_date || todayStr;
+      const endDate = req.query.end_date || todayStr;
+      const dateFilter = (col) => `date(${col}) >= ? AND date(${col}) <= ?`;
+      const dateParams = [startDate, endDate];
+
       const all = (sql, params = []) => new Promise((resolve, reject) => db.all(sql, params, (e, r) => e ? reject(e) : resolve(r || [])));
       const nameOf = async (code) => {
         if (!code) return '';
@@ -255,23 +295,23 @@ module.exports = function readonlyRoutes(ctx) {
         return f ? f.fund_name : code;
       };
       const items = [];
-      const txs = await all('SELECT transaction_type, fund_code, amount, shares, fees, transaction_date, reason FROM transactions WHERE user_id = ? ORDER BY transaction_date DESC LIMIT 8', [userId]);
+      const txs = await all(`SELECT transaction_type, fund_code, amount, shares, fees, transaction_date, reason FROM transactions WHERE user_id = ? AND ${dateFilter('transaction_date')} ORDER BY transaction_date DESC LIMIT 50`, [userId, ...dateParams]);
       for (const t of txs) {
-        items.push({ time: t.transaction_date, type: t.transaction_type === 'BUY' ? 'buy' : 'sell', title: `${t.transaction_type === 'BUY' ? '买入' : '卖出'} ${t.fund_code} ${t.fund_code}`, desc: `${t.transaction_type === 'BUY' ? '买入' : '卖出'} ¥${(t.amount || 0).toFixed(2)}（${(t.shares || 0).toLocaleString()} 份）· 手续费 ¥${(t.fees || 0).toFixed(2)}${t.reason ? ' · ' + t.reason : ''}` });
+        items.push({ time: fmtDT(t.transaction_date), type: t.transaction_type === 'BUY' ? 'buy' : 'sell', title: `${t.transaction_type === 'BUY' ? '买入' : '卖出'} ${t.fund_code}`, desc: `${t.transaction_type === 'BUY' ? '买入' : '卖出'} ¥${(t.amount || 0).toFixed(2)}（${(t.shares || 0).toLocaleString()} 份）· 手续费 ¥${(t.fees || 0).toFixed(2)}${t.reason ? ' · ' + t.reason : ''}` });
       }
-      const ords = await all("SELECT order_type, fund_code, amount, shares, price, status, reason, created_at FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 6", [userId]);
+      const ords = await all(`SELECT order_type, fund_code, amount, shares, price, status, reason, created_at FROM orders WHERE user_id = ? AND ${dateFilter('created_at')} ORDER BY created_at DESC LIMIT 30`, [userId, ...dateParams]);
       for (const o of ords) {
         items.push({ time: o.created_at, type: o.status === 'SUBMITTED' ? 'pending' : 'order', title: `${o.order_type === 'BUY' ? '买入' : '卖出'}订单 ${o.fund_code}${o.status === 'SUBMITTED' ? '（待确认）' : ''}`, desc: o.reason || `金额 ¥${(o.amount || 0).toFixed(2)}` });
       }
-      const risks = await all('SELECT event_type, fund_code, detail, created_at FROM risk_events WHERE user_id = ? ORDER BY created_at DESC LIMIT 6', [userId]);
+      const risks = await all(`SELECT event_type, fund_code, detail, created_at FROM risk_events WHERE user_id = ? AND ${dateFilter('created_at')} ORDER BY created_at DESC LIMIT 30`, [userId, ...dateParams]);
       for (const rv of risks) {
         items.push({ time: rv.created_at, type: 'risk', title: `风控：${rv.event_type} ${rv.fund_code}`, desc: rv.detail || '' });
       }
-      const audits = await all("SELECT actor, action, target, detail, created_at FROM audit_logs WHERE target LIKE ? ORDER BY created_at DESC LIMIT 6", ['%' + userId + '%']);
+      const audits = await all(`SELECT actor, action, target, detail, created_at FROM audit_logs WHERE target LIKE ? AND ${dateFilter('created_at')} ORDER BY created_at DESC LIMIT 30`, ['%' + userId + '%', ...dateParams]);
       for (const au of audits) {
         items.push({ time: au.created_at, type: 'audit', title: `${au.actor} · ${au.action}${au.target ? ' ' + au.target : ''}`, desc: (au.detail || '').slice(0, 120) });
       }
-      const anas = await all("SELECT analysis_type, fund_code, decision, confidence, entry_price, target_price, stop_loss, analysis_time, signal_label, signal_reason FROM analysis_logs WHERE user_id = ? ORDER BY analysis_time DESC LIMIT 5", [userId]);
+      const anas = await all(`SELECT analysis_type, fund_code, decision, confidence, entry_price, target_price, stop_loss, analysis_time, signal_label, signal_reason FROM analysis_logs WHERE user_id = ? AND ${dateFilter('analysis_time')} ORDER BY analysis_time DESC LIMIT 50`, [userId, ...dateParams]);
       for (const a of anas) {
         if (a.analysis_type === 'hotspot') {
           items.push({ time: a.analysis_time, type: 'hotspot', title: `热点分析 ${a.signal_label || '市场'} → ${a.decision}`, desc: a.signal_reason || '' });
@@ -286,7 +326,7 @@ module.exports = function readonlyRoutes(ctx) {
         const nm = codeMatch ? await nameOf(codeMatch[1]) : '';
         out.push({ ...it, fund_name: nm });
       }
-      res.json({ list: out });
+      res.json({ list: out, start_date: startDate, end_date: endDate });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -301,7 +341,7 @@ module.exports = function readonlyRoutes(ctx) {
       });
       const round2 = v => Math.round(v * 100) / 100;
       const detail = rows.map(t => ({
-        id: t.id, transaction_date: t.transaction_date, fund_code: t.fund_code,
+        id: t.id, transaction_date: fmtDT(t.transaction_date), fund_code: t.fund_code,
         fund_name: t.fund_name, transaction_type: t.transaction_type, amount: t.amount,
         shares: t.shares, price: t.price, fees: round2(t.fees || 0),
         rate: t.amount > 0 ? Number((((t.fees || 0) / t.amount) * 100).toFixed(4)) : 0

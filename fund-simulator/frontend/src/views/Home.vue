@@ -94,6 +94,22 @@ const transactions = ref<any[]>([])
 const pendingTxs = ref<any[]>([]) // 待确认订单（T+1）
 const aiStats = ref<any>(null) // AI 经营成绩单
 const aiActivity = ref<any[]>([]) // AI 决策轨迹
+// 决策轨迹时间范围（默认当天）
+const activityDateRange = ref<any[]>([])
+{
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  activityDateRange.value = [`${yyyy}-${mm}-${dd}`, `${yyyy}-${mm}-${dd}`]
+}
+const loadActivity = async () => {
+  try {
+    const [start, end] = activityDateRange.value || []
+    const actRes = await axios.get('/api/ai/activity', { params: { limit: 100, start_date: start, end_date: end } })
+    aiActivity.value = (actRes.data && actRes.data.list) || []
+  } catch (e) { console.error('加载决策轨迹失败', e) }
+}
 const hotspots = ref<any>(null) // AI 市场热点分析
 const aiCompare = ref<any>(null) // 双经理经营对比
 const { logs: liveLogs, status: liveStatus, connect: connectSSE } = useSSE('/api/ai/stream') // AI 实时日志流（SSE 复用 composable）
@@ -236,8 +252,7 @@ const loadAllData = async () => {
     try {
       const statsRes = await axios.get('/api/ai/stats')
       aiStats.value = statsRes.data
-      const actRes = await axios.get('/api/ai/activity', { params: { limit: 12 } })
-      aiActivity.value = (actRes.data && actRes.data.list) || []
+      await loadActivity()
       // AI 市场热点
       try {
         const hpRes = await axios.get('/api/ai/hotspots')
@@ -1322,10 +1337,18 @@ onMounted(() => {
     </div>
 
     <!-- AI 决策轨迹 -->
-    <div v-if="aiActivity.length" class="card">
+    <div class="card">
       <div class="card-header">
         <h3>🧠 AI 决策轨迹</h3>
-        <span class="badge info">最近 {{ aiActivity.length }} 条动作</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <a-range-picker
+            v-model:value="activityDateRange"
+            size="small"
+            style="width:260px"
+            @change="loadActivity"
+          />
+          <span class="badge info">{{ aiActivity.length }} 条动作</span>
+        </div>
       </div>
       <div class="card-body">
         <div class="activity-list">
@@ -1660,7 +1683,7 @@ onMounted(() => {
 .s-value { font-size: 14px; font-weight: 600; color: #e2e8f0; }
 .s-value small { font-weight: 400; color: #64748b; font-size: 11px; }
 .risk-tag { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 8px; font-size: 11px; background: rgba(139,92,246,0.15); color: #a78bfa; }
-.activity-list { display: flex; flex-direction: column; gap: 8px; }
+.activity-list { display: flex; flex-direction: column; gap: 8px; max-height: 500px; overflow-y: auto; }
 .activity-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; background: rgba(15,20,40,0.4); border-radius: 8px; }
 .act-time { font-size: 12px; color: #64748b; white-space: nowrap; padding-top: 2px; }
 .act-type { flex: 0 0 auto; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; }
@@ -2021,7 +2044,21 @@ onMounted(() => {
 .badge.warning { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
 
 /* 表格 */
-.table-container { overflow-x: auto; }
+/* 表格容器：最大高度 + 纵向滚动 + 表头固定 */
+.table-container {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+  max-height: 500px;
+  position: relative;
+}
+.table-container thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #1c2348;
+  color: #e8ebff;
+}
 
 .data-table {
   width: 100%;
@@ -2133,6 +2170,8 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 16px;
+  max-height: 450px;
+  overflow-y: auto;
 }
 
 .watch-item {

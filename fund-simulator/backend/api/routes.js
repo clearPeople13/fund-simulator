@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const sqlite3 = require('sqlite3').verbose();
 const FundDataFetcher = require('../data-fetcher');
@@ -319,8 +319,8 @@ router.post('/portfolios/:id/buy', async (req, res) => {
         const newShares = holding.shares + shares;
         const newCost = (holding.cost_price * holding.shares + amount) / newShares;
         
-        db.run('UPDATE holdings SET shares = ?, cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-          [newShares, newCost, holding.id], function(err) {
+        db.run('UPDATE holdings SET shares = ?, cost_price = ?, updated_at = ? WHERE id = ?', 
+          [newShares, newCost, Date.now(), holding.id], function(err) {
             if (err) {
               res.status(500).json({ error: err.message });
               return;

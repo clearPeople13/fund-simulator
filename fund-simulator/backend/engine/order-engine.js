@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 订单执行引擎（真实时间申赎）
  * 规格来源：fund/AI_FUND_OPERATIONS_DESIGN.md §3.3 §4.4 §5.2
  *
@@ -11,6 +11,21 @@
  *   - 买入：T+1 份额确认，T+1 起计收益
  *   - 卖出：T+1 确认到账，收益计算至 T 日止
  */
+
+
+// 把 trade_date（毫秒时间戳或字符串）转成当天 15:00:00 的毫秒时间戳
+function tradeDateToTs(tradeDate) {
+  let d;
+  if (typeof tradeDate === 'number') {
+    d = new Date(tradeDate);
+  } else {
+    d = new Date(String(tradeDate).replace(' ', 'T'));
+    if (isNaN(d.getTime())) d = new Date(Number(tradeDate));
+  }
+  if (isNaN(d.getTime())) return Date.now();
+  d.setHours(15, 0, 0, 0);
+  return d.getTime();
+}
 
 const feeModule = require('./fee');
 
@@ -172,7 +187,8 @@ async function confirmPendingOrders(ctx, confirmDate) {
           price: confirmPrice,
           shares: confirmShares,
           fees: order.fee,
-          reason: order.reason || 'AI自动建仓（收盘信号）'
+          reason: order.reason || 'AI自动建仓（收盘信号）',
+          transaction_date: order.created_at
         });
         order.shares = confirmShares;
       } else if (order.order_type === 'SELL') {
@@ -234,7 +250,8 @@ async function confirmPendingOrders(ctx, confirmDate) {
           price: confirmPrice,
           shares: sellShares,
           fees: sellFee,
-          reason: (order.reason || 'AI自动退场') + '（FIFO: ' + batchNotes.join('；') + '）'
+          reason: (order.reason || 'AI自动退场') + '（FIFO: ' + batchNotes.join('；') + '）',
+          transaction_date: order.created_at
         });
       }
 
